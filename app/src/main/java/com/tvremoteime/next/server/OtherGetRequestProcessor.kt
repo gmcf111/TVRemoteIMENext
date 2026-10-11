@@ -35,7 +35,7 @@ class OtherGetRequestProcessor(private val context: Context) : RequestProcessor 
     }
 
     private fun getSDCardStatResponse(): NanoHTTPD.Response {
-        val path = ServerFileManager.baseDir
+        val path = ServerFileManager.storageRoot
         val stat = StatFs(path.path)
         val totalBytes: Long
         val availableBytes: Long

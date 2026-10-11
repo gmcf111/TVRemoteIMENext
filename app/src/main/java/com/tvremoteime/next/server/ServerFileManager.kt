@@ -12,31 +12,43 @@ import java.net.URLDecoder
 /**
  * 服务器文件管理（对应旧版 RemoteServerFileManager.java）
  *
- * baseDir 阶段 1 保持旧版语义（外部存储根）；
- * 阶段 2 切换为 MANAGE_EXTERNAL_STORAGE 引导 + 降级（02/03 文档）。
+ * 两个目录语义（与旧版一致，拆分显式化）：
+ * - dataDir：应用外部私有目录（getExternalFilesDir）——上传落地、tv.txt、play.torrent、缓存
+ * - storageRoot：文件浏览/下载的根——全盘授权=外部存储根（旧版体验）；未授权=私有目录降级
  */
 object ServerFileManager {
     private const val TAG = "ServerFileManager"
 
+    /** 应用私有数据目录（tv.txt、play.torrent、上传文件、缓存） */
     @Volatile
-    var baseDir: File = android.os.Environment.getExternalStorageDirectory()
+    var dataDir: File = File(android.os.Environment.getExternalStorageDirectory(), "Android/data/com.tvremoteime.next/files")
         private set
 
-    private var filesDir = File(baseDir, "tvremoteime/files")
-    private var tmpDataDir = File(baseDir, "tvremoteime/temp")
-    private var playerCacheDir = File(baseDir, "tvremoteime/xlplayer")
+    /** 文件浏览根（Web 端文件管理） */
+    @Volatile
+    var storageRoot: File = android.os.Environment.getExternalStorageDirectory()
+        private set
+
+    private var filesDir = File(dataDir, "files")
+    private var tmpDataDir = File(dataDir, "temp")
+    private var playerCacheDir = File(dataDir, "xlplayer")
 
     fun resetBaseDir(context: Context) {
-        // 阶段 1：保持与旧版一致的全盘路径（4.4-10 系统直接可写）
-        baseDir = android.os.Environment.getExternalStorageDirectory()
-        filesDir = File(baseDir, "tvremoteime/files")
-        tmpDataDir = File(baseDir, "tvremoteime/temp")
-        playerCacheDir = File(baseDir, "tvremoteime/xlplayer")
+        dataDir = context.getExternalFilesDir(null) ?: context.filesDir
+        storageRoot = com.tvremoteime.next.core.StorageHelper.getStorageRoot(context)
+        filesDir = File(dataDir, "files")
+        tmpDataDir = File(dataDir, "temp")
+        playerCacheDir = File(dataDir, "xlplayer")
+        try {
+            if (!filesDir.exists()) filesDir.mkdirs()
+            if (!tmpDataDir.exists()) tmpDataDir.mkdirs()
+        } catch (ignored: Exception) {
+        }
     }
 
-    fun getPlayTorrentFile(): File = File(baseDir, "tvremoteime/play.torrent")
+    fun getPlayTorrentFile(): File = File(dataDir, "play.torrent")
 
-    fun getScreenShotFile(): File = File(baseDir, "tvremoteime/screenshot.png")
+    fun getScreenShotFile(): File = File(dataDir, "screenshot.png")
 
     private class SDCardTempFile(fileName: String?) : NanoHTTPD.TempFile {
         private val file: File

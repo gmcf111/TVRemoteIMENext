@@ -20,7 +20,8 @@ import java.io.OutputStreamWriter
  */
 class TVRequestProcessor(private val context: Context) : RequestProcessor {
 
-    private val tvFile: File get() = File(ServerFileManager.baseDir, "tv.txt")
+    // 旧版语义：tv.txt 位于应用外部私有目录（/Android/data/<pkg>/files/tv.txt，01 文档）
+    private val tvFile: File get() = File(ServerFileManager.dataDir, "tv.txt")
 
     override fun isRequest(session: NanoHTTPD.IHTTPSession, fileName: String): Boolean =
         fileName.equals("/tv.txt", ignoreCase = true)

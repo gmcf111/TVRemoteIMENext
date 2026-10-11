@@ -64,7 +64,7 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
     )
 
     private fun responseDirData(dirName: String): NanoHTTPD.Response {
-        val root = ServerFileManager.baseDir
+        val root = ServerFileManager.storageRoot
         val path = File(root, dirName)
         val dirs = JSONArray()
         val files = JSONArray()
@@ -100,7 +100,7 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
     }
 
     private fun downloadFileData(fileName: String): NanoHTTPD.Response {
-        val file = File(ServerFileManager.baseDir, fileName)
+        val file = File(ServerFileManager.storageRoot, fileName)
         if (!file.exists()) return notFound()
         return try {
             FileInputStream(file).use { input ->
@@ -121,7 +121,7 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
         val localFilename = files["file"]
         var success = false
         if (!uploadFileName.isNullOrEmpty() && !localFilename.isNullOrEmpty()) {
-            val saveDir = File(ServerFileManager.baseDir, uploadPathName ?: "")
+            val saveDir = File(ServerFileManager.storageRoot, uploadPathName ?: "")
             val localFile = File(localFilename)
             val saveFile = File(saveDir, localFile.name)
             success = localFile.renameTo(saveFile)
@@ -133,23 +133,23 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
 
     private fun batchDeleteFile(paths: String) {
         for (p in paths.split("|")) {
-            if (p.isNotEmpty()) ServerFileManager.deleteFile(File(ServerFileManager.baseDir, p))
+            if (p.isNotEmpty()) ServerFileManager.deleteFile(File(ServerFileManager.storageRoot, p))
         }
     }
 
     private fun batchCopyFile(targetPath: String?, paths: String) {
-        val targetPathFile = File(ServerFileManager.baseDir, targetPath ?: "")
+        val targetPathFile = File(ServerFileManager.storageRoot, targetPath ?: "")
         if (!targetPathFile.exists()) return
         for (p in paths.split("|")) {
-            if (p.isNotEmpty()) ServerFileManager.copyFile(File(ServerFileManager.baseDir, p), targetPathFile)
+            if (p.isNotEmpty()) ServerFileManager.copyFile(File(ServerFileManager.storageRoot, p), targetPathFile)
         }
     }
 
     private fun batchCutFile(targetPath: String?, paths: String) {
-        val targetPathFile = File(ServerFileManager.baseDir, targetPath ?: "")
+        val targetPathFile = File(ServerFileManager.storageRoot, targetPath ?: "")
         if (!targetPathFile.exists()) return
         for (p in paths.split("|")) {
-            if (p.isNotEmpty()) ServerFileManager.cutFile(File(ServerFileManager.baseDir, p), targetPathFile)
+            if (p.isNotEmpty()) ServerFileManager.cutFile(File(ServerFileManager.storageRoot, p), targetPathFile)
         }
     }
 }

@@ -13,6 +13,7 @@ import com.tvremoteime.next.adb.AdbHelper
 import com.tvremoteime.next.core.AppPackagesHelper
 import com.tvremoteime.next.core.Env
 import com.tvremoteime.next.core.QRCodeGen
+import com.tvremoteime.next.core.StorageHelper
 import com.tvremoteime.next.dlna.DLNAUtils
 import com.tvremoteime.next.IME.IMEService
 import com.tvremoteime.next.server.RemoteServer
@@ -43,7 +44,24 @@ class MainActivity : Activity(), View.OnClickListener {
         title = resources.getString(R.string.app_name) + "  V" + AppPackagesHelper.getCurrentPackageVersion(this)
         dlnaNameText?.setText(DLNAUtils.getDLNANameSuffix(applicationContext))
 
+        requestStorageIfNeeded()
         refreshQRCode()
+    }
+
+    /** 阶段 2：存储权限引导（03 文档适配清单 2） */
+    private fun requestStorageIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            if (!StorageHelper.hasFullDiskAccess(this)) {
+                Env.toast(this, "建议授予「所有文件访问」权限，以使用完整的文件管理功能")
+                StorageHelper.requestFullDiskAccess(this)
+            }
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 100)
+            }
+        }
     }
 
     override fun onClick(v: View) {
