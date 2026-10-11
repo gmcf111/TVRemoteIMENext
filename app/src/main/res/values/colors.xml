@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="white">#ffffffff</color>
+    <color name="gray">#c9c9c9</color>
     <color name="brand_primary">#0061A4</color>
     <color name="brand_primary_dark">#00497E</color>
     <color name="window_background">#101418</color>

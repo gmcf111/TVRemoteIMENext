@@ -48,6 +48,7 @@ dependencies {
     implementation project(':adb-lib')
     implementation project(':ijkplayer')
     implementation project(':thunder')
+    implementation project(':DroidDLNA')
 
     implementation libs.androidx.core
     implementation libs.androidx.appcompat

@@ -1,9 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Application theme（M3，阶段 0 骨架版；阶段 5 接入主题色自定义 overlay） -->
     <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorSecondaryContainer">@color/brand_primary_dark</item>
         <item name="android:windowBackground">@color/window_background</item>
+    </style>
+    <style name="PlayerTheme" parent="android:Theme.NoTitleBar.Fullscreen">
+    </style>
+    <style name="btn_input_style">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">#fff</item>
+        <item name="android:layout_marginRight">5dp</item>
+        <item name="android:background">@drawable/key</item>
+        <item name="android:onClick">onClick</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:focusable">true</item>
     </style>
 </resources>
