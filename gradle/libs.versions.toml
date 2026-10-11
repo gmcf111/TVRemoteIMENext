@@ -1,0 +1,35 @@
+[versions]
+agp = "8.13.2"
+kotlin = "2.3.10"
+jvmTarget = "17"
+minSdk = "19"
+targetSdk = "35"
+compileSdk = "35"
+# AndroidX/Material 均要求 API 19+，锁 19（Android 4.4，用户决策 D15）
+androidxCore = "1.13.1"
+androidxAnnotation = "1.8.1"
+material = "1.11.0"          # 最后一个支持 minSdk 19 的版本；1.12+ 需要 minSdk 19 但动态取色更稳，后续验证
+appcompat = "1.6.1"
+constraintlayout = "2.1.4"
+recyclerview = "1.2.1"       # 确定存在且支持低版本；1.2.2 不存在（1.2.0→1.2.1→1.3.0）
+nanohttpd = "2.3.1"
+zxing = "3.5.3"
+coroutines = "1.8.1"
+junit = "4.13.2"
+
+[libraries]
+androidx-core = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "androidxAnnotation" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+androidx-recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+nanohttpd = { group = "org.nanohttpd", name = "nanohttpd", version.ref = "nanohttpd" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
