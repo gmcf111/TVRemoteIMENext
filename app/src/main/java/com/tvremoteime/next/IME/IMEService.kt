@@ -49,6 +49,11 @@ class IMEService : InputMethodService(), View.OnClickListener {
     private var mInputView: RelativeLayout? = null
     private var hideWindowByKey = false
 
+    // 主题色动态按键背景缓存（onCreateInputView 时构建）
+    private var keyModernBg: android.graphics.drawable.Drawable? = null
+    private var keyShiftOnBg: android.graphics.drawable.Drawable? = null
+    private var keyShiftOffBg: android.graphics.drawable.Drawable? = null
+
     private var helpDialog: View? = null
     private var qrCodeImage: android.widget.ImageView? = null
     private var addressView: TextView? = null
@@ -79,6 +84,9 @@ class IMEService : InputMethodService(), View.OnClickListener {
     override fun onCreateInputView(): View {
         mInputView = layoutInflater.inflate(R.layout.keyboard, null) as RelativeLayout
 
+        // 主题色跟随（04 文档 5.1）：一次构建动态 drawable 并缓存，键背景全部替换
+        applyKeyboardTheme()
+
         capsOn = true
         btnCaps = mInputView?.findViewById(R.id.btnCaps)
         qweLine = mInputView?.findViewById(R.id.qweLine)
@@ -92,6 +100,42 @@ class IMEService : InputMethodService(), View.OnClickListener {
         toggleCapsState(true)
 
         return mInputView!!
+    }
+
+    /** 键盘主题化：按当前主题色生成三套键背景，遍历替换（含 Shift/功能键） */
+    private fun applyKeyboardTheme() {
+        val view = mInputView ?: return
+        val modern = com.tvremoteime.next.theme.KeyboardDrawableFactory.createModernKey(this)
+        val action = com.tvremoteime.next.theme.KeyboardDrawableFactory.createActionKey(this)
+        val shiftOn = com.tvremoteime.next.theme.KeyboardDrawableFactory.createShiftOnKey(this)
+        val shiftOff = com.tvremoteime.next.theme.KeyboardDrawableFactory.createShiftOffKey(this)
+        // 缓存给 clickButtonByKey / toggleCapsState 复用
+        keyModernBg = modern
+        keyShiftOnBg = shiftOn
+        keyShiftOffBg = shiftOff
+
+        val actionIds = setOf(R.id.btnDelete, R.id.btnEnter, R.id.btnSpace, R.id.btnHelp, R.id.btnClose)
+        for (i in 0 until view.childCount) {
+            val row = view.getChildAt(i) as? android.view.ViewGroup ?: continue
+            for (j in 0 until row.childCount) {
+                val child = row.getChildAt(j) ?: continue
+                when (child.id) {
+                    R.id.btnCaps -> child.background = shiftOff
+                    in actionIds -> child.background = action
+                    else -> if (child is Button || child is ImageButton) child.background = modern
+                }
+            }
+        }
+        // 帮助弹窗嵌套层（helpDialog 内无按键）
+        // 键盘容器背景：主题色调浅色（替代布局里写死的 #444）
+        val accent = com.tvremoteime.next.theme.ThemePrefs.getAccentColor(this)
+        if (accent != null) {
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(accent, hsv)
+            hsv[1] *= 0.18f
+            hsv[2] = 0.93f
+            view.setBackgroundColor(android.graphics.Color.HSVToColor(hsv))
+        }
     }
 
     override fun onEvaluateInputViewShown(): Boolean {
@@ -342,19 +386,19 @@ class IMEService : InputMethodService(), View.OnClickListener {
 
     private fun clickButtonByKey(v: View) {
         when (v.id) {
-            R.id.btnCaps -> v.setBackgroundResource(if (capsOn) R.drawable.key_special_on else R.drawable.key_special_off)
+            R.id.btnCaps -> v.background = if (capsOn) keyShiftOnBg else keyShiftOffBg
             R.id.btnClose -> {
                 hideWindowByKey = true
                 finishInput()
                 return
             }
-            else -> v.setBackgroundResource(R.drawable.key_modern)
+            else -> keyModernBg?.let { v.background = it }
         }
         clickButton(v, false)
         handler.postDelayed({
             when {
-                v === btnCaps -> v.setBackgroundResource(if (capsOn) R.drawable.key_special_on else R.drawable.key_special_off)
-                else -> v.setBackgroundResource(R.drawable.key_modern)
+                v === btnCaps -> v.background = if (capsOn) keyShiftOnBg else keyShiftOffBg
+                else -> keyModernBg?.let { v.background = it }
             }
             v.requestFocus()
         }, 200)
@@ -392,7 +436,7 @@ class IMEService : InputMethodService(), View.OnClickListener {
     private fun toggleCapsState(resetCapsButtonState: Boolean) {
         capsOn = !capsOn
         if (resetCapsButtonState)
-            btnCaps?.setBackgroundResource(if (capsOn) R.drawable.key_special_on else R.drawable.key_special_off)
+            keyShiftOffBg?.let { btnCaps?.background = it }
         resetButtonChar(qweLine)
         resetButtonChar(asdLine)
         resetButtonChar(zxcLine)
