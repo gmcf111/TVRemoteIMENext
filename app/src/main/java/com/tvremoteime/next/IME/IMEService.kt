@@ -342,19 +342,19 @@ class IMEService : InputMethodService(), View.OnClickListener {
 
     private fun clickButtonByKey(v: View) {
         when (v.id) {
-            R.id.btnCaps -> v.setBackgroundResource(if (capsOn) R.drawable.key_pressed_on else R.drawable.key_pressed_off)
+            R.id.btnCaps -> v.setBackgroundResource(if (capsOn) R.drawable.key_special_on else R.drawable.key_special_off)
             R.id.btnClose -> {
                 hideWindowByKey = true
                 finishInput()
                 return
             }
-            else -> v.setBackgroundResource(R.drawable.key_pressed)
+            else -> v.setBackgroundResource(R.drawable.key_modern)
         }
         clickButton(v, false)
         handler.postDelayed({
             when {
-                v === btnCaps -> v.setBackgroundResource(if (capsOn) R.drawable.key_on else R.drawable.key_off)
-                else -> v.setBackgroundResource(R.drawable.key)
+                v === btnCaps -> v.setBackgroundResource(if (capsOn) R.drawable.key_special_on else R.drawable.key_special_off)
+                else -> v.setBackgroundResource(R.drawable.key_modern)
             }
             v.requestFocus()
         }, 200)
@@ -392,7 +392,7 @@ class IMEService : InputMethodService(), View.OnClickListener {
     private fun toggleCapsState(resetCapsButtonState: Boolean) {
         capsOn = !capsOn
         if (resetCapsButtonState)
-            btnCaps?.setBackgroundResource(if (capsOn) R.drawable.key_on else R.drawable.key_off)
+            btnCaps?.setBackgroundResource(if (capsOn) R.drawable.key_special_on else R.drawable.key_special_off)
         resetButtonChar(qweLine)
         resetButtonChar(asdLine)
         resetButtonChar(zxcLine)

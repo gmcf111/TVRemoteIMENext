@@ -152,6 +152,7 @@
         <ImageButton
             android:id="@+id/btnDelete"
             style="@style/btn_input_style"
+            android:background="@drawable/key_action"
             android:layout_width="wrap_content"
             android:src="@drawable/delete_icon" />
     </LinearLayout>
@@ -170,7 +171,7 @@
             style="@style/btn_input_style"
             android:layout_width="wrap_content"
             android:src="@drawable/shift_icon"
-            android:background="@drawable/key_off"/>
+            android:background="@drawable/key_special_off"/>
 
         <Button
             style="@style/btn_input_style"
@@ -203,6 +204,7 @@
         <ImageButton
             android:id="@+id/btnEnter"
             style="@style/btn_input_style"
+            android:background="@drawable/key_action"
             android:layout_width="wrap_content"
             android:src="@drawable/enter_icon" />
     </LinearLayout>
@@ -231,6 +233,7 @@
         <ImageButton
             android:id="@+id/btnSpace"
             style="@style/btn_input_style"
+            android:background="@drawable/key_action"
             android:layout_width="wrap_content"
             android:src="@drawable/space_icon" />
 
@@ -250,10 +253,12 @@
             android:id="@+id/btnHelp"
             android:src="@drawable/net_icon"
             android:layout_width="wrap_content"
+            android:background="@drawable/key_action"
             style="@style/btn_input_style" />
         <Button
             android:id="@+id/btnClose"
             style="@style/btn_input_style"
+            android:background="@drawable/key_action"
             android:text="▲" />
     </LinearLayout>
     <RelativeLayout
