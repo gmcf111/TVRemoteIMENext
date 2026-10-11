@@ -1,0 +1,62 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+}
+
+android {
+    namespace 'com.tvremoteime.next'
+    compileSdk libs.versions.compileSdk.get().toInteger()
+
+    defaultConfig {
+        applicationId "com.tvremoteime.next"
+        minSdk libs.versions.minSdk.get().toInteger()
+        targetSdk libs.versions.targetSdk.get().toInteger()
+        versionCode 200
+        versionName "2.0.0"
+        // minSdk 19 < 21 必须 legacy multidex（方法数 68k 超限）
+        multiDexEnabled true
+        // 仅 32 位（03 文档决策）：NDK 不在 CI 引入，v7a so 全部随包
+        ndk {
+            abiFilters 'armeabi-v7a'
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // debug 签名自用（用户决策 D12），正式发布前提醒用户配置 release keystore
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation project(':adb-lib')
+    implementation project(':ijkplayer')
+    implementation project(':thunder')
+
+    implementation libs.androidx.core
+    implementation libs.androidx.appcompat
+    implementation libs.androidx.constraintlayout
+    implementation libs.material
+    implementation libs.nanohttpd
+    implementation libs.zxing.core
+    implementation libs.kotlinx.coroutines.android
+    implementation "androidx.multidex:multidex:2.0.1"
+
+    testImplementation libs.junit
+}
