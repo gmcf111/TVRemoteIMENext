@@ -51,6 +51,20 @@
         <service android:name="com.zxt.dlna.dmr.RenderPlayerService" />
         <service android:name="org.fourthline.cling.android.AndroidUpnpServiceImpl" />
 
+        <!-- 触控板：辅助功能服务（API 24+ dispatchGesture；低版本自动回退 ADB/shell） -->
+        <service
+            android:name=".mouse.MouseAccessibilityService"
+            android:exported="false"
+            android:label="@string/keyboard_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

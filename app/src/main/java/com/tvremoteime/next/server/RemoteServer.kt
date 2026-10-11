@@ -67,6 +67,7 @@ class RemoteServer(
             add(FileRequestProcessor(context))
             add(AppIconRequestProcessor(context))
             add(TVRequestProcessor(context))
+            add(MouseRequestProcessor(context, this@RemoteServer))
             add(OtherGetRequestProcessor(context))
         }
     }
@@ -74,6 +75,7 @@ class RemoteServer(
     private fun addPostRequestProcessors() {
         postRequestProcessors.apply {
             add(InputRequestProcessor(context, this@RemoteServer))
+            add(MouseRequestProcessor(context, this@RemoteServer))
             add(UploadRequestProcessor(context))
             add(AppRequestProcessor(context))
             add(PlayRequestProcessor(context))
