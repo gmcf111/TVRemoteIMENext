@@ -1,0 +1,32 @@
+plugins {
+    alias(libs.plugins.android.library)
+}
+
+// DroidDLNA（Cling 2.1 + Jetty 8 时代的完整 UPnP 栈）
+// 阶段 1 原样迁入保功能；阶段 3 按计划替换为 jUPnP/Cling Maven 依赖 + Kotlin 业务重封装（03 文档）
+// 554 个 Java 文件 + 21 个 jar 不做任何修改
+android {
+    namespace 'com.zxt.dlna'
+    compileSdk libs.versions.compileSdk.get().toInteger()
+
+    defaultConfig {
+        minSdk libs.versions.minSdk.get().toInteger()
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
+}
+
+dependencies {
+    // Cling 2.1.2 与 Jetty 8 等老 jar，仅此一处集中声明
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation project(':ijkplayer')
+    implementation libs.androidx.annotation
+}
