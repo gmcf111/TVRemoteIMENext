@@ -1,0 +1,27 @@
+plugins {
+    alias(libs.plugins.android.library)
+}
+
+// ijkplayer 封装层：Java 代码 Kotlin 重写在阶段 1 进行，本阶段先原样迁入保证构建通过
+android {
+    namespace 'com.tvremoteime.ijkplayer'
+    compileSdk libs.versions.compileSdk.get().toInteger()
+
+    defaultConfig {
+        minSdk libs.versions.minSdk.get().toInteger()
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // ijkplayer-java/exo 只在 jcenter 发布过（已停服），经阿里云 jcenter 镜像解析；0.8.4 为旧工程同款版本
+    api 'tv.danmaku.ijk.media:ijkplayer-java:0.8.4'
+    api 'tv.danmaku.ijk.media:ijkplayer-exo:0.8.4'
+    implementation project(':thunder')
+    implementation libs.androidx.annotation
+    implementation libs.androidx.recyclerview
+}

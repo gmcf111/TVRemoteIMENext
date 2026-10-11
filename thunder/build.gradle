@@ -1,0 +1,29 @@
+plugins {
+    alias(libs.plugins.android.library)
+}
+
+// 迅雷下载封装：JNI 参数类保持 Java 原样（03 文档决策），so 原样保留
+android {
+    namespace 'com.xunlei.downloadlib'
+    compileSdk libs.versions.compileSdk.get().toInteger()
+
+    defaultConfig {
+        minSdk libs.versions.minSdk.get().toInteger()
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // 遗留代码基线（07 文档）：JNI 参数类原样保留、永不改动，lint 全量关停
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+        disable 'MissingPermission', 'UnsafeProtectedLauncherActivity', 'ProtectedPermissions', 'WorldReadableFiles', 'WakeLock', 'WakelockTimeout', 'UnusedResources', 'UnusedAttribute', 'ExpiredTargetSdkVersion', 'QueryAllPackagesPermission'
+    }
+}
+
+dependencies {
+    // 无外部依赖：org.json 随 Android 运行时提供
+}
