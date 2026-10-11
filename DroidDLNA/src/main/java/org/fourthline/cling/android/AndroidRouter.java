@@ -65,7 +65,12 @@ public class AndroidRouter extends RouterImpl {
         // Only register for network connectivity changes if we are not running on emulator
         if (!ModelUtil.ANDROID_EMULATOR) {
             this.broadcastReceiver = new ConnectivityBroadcastReceiver();
-            context.registerReceiver(broadcastReceiver, new IntentFilter("android.net.conn.CONNECTIVITY_CHANGE"));
+            // targetSdk 34+：动态注册广播必须显式声明 RECEIVER_EXPORTED/NOT_EXPORTED flag
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                context.registerReceiver(broadcastReceiver, new IntentFilter("android.net.conn.CONNECTIVITY_CHANGE"), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
+            } else {
+                context.registerReceiver(broadcastReceiver, new IntentFilter("android.net.conn.CONNECTIVITY_CHANGE"));
+            }
         }
     }
 

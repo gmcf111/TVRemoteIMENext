@@ -145,7 +145,12 @@ public class IJKPlayer extends XLVideoPlayActivity
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(Action.DMR);
         intentFilter.addAction(Action.VIDEO_PLAY);
-        registerReceiver(this.playRecevieBrocast, intentFilter);
+        // targetSdk 34+：App 内部广播显式 NOT_EXPORTED
+        if (android.os.Build.VERSION.SDK_INT >= 34) {
+            registerReceiver(this.playRecevieBrocast, intentFilter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(this.playRecevieBrocast, intentFilter);
+        }
     }
 
     public void unregisterBrocast() {
