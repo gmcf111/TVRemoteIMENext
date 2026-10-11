@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 预设色主色（04 文档 5.3；容器色由 TonalPalette 动态计算，主色落 XML 供 overlay 引用） -->
+    <color name="next_theme_seed_purple">#6750A4</color>
+    <color name="next_theme_seed_blue">#1565C0</color>
+    <color name="next_theme_seed_teal">#00897B</color>
+    <color name="next_theme_seed_green">#2E7D32</color>
+    <color name="next_theme_seed_yellow">#F9A825</color>
+    <color name="next_theme_seed_orange">#EF6C00</color>
+    <color name="next_theme_seed_red">#C62828</color>
+    <color name="next_theme_seed_pink">#AD1457</color>
+    <color name="next_theme_seed_brown">#5D4037</color>
+    <color name="next_theme_seed_skyblue">#0061A4</color>
+</resources>

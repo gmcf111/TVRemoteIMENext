@@ -566,6 +566,120 @@ function setupScreenshot() {
 	});
 }
 
+// ==================== 主题色（04 文档 5.4，阶段 5） ====================
+
+var THEME_PRESETS = [
+	{ id:'purple',  hex:'#6750A4', zh:'紫',   en:'Purple' },
+	{ id:'blue',    hex:'#1565C0', zh:'蓝',   en:'Blue' },
+	{ id:'teal',    hex:'#00897B', zh:'青',   en:'Teal' },
+	{ id:'green',   hex:'#2E7D32', zh:'绿',   en:'Green' },
+	{ id:'yellow',  hex:'#F9A825', zh:'黄',   en:'Yellow' },
+	{ id:'orange',  hex:'#EF6C00', zh:'橙',   en:'Orange' },
+	{ id:'red',     hex:'#C62828', zh:'红',   en:'Red' },
+	{ id:'pink',    hex:'#AD1457', zh:'粉',   en:'Pink' },
+	{ id:'brown',   hex:'#5D4037', zh:'茶灰', en:'Brown' },
+	{ id:'skyblue', hex:'#0061A4', zh:'天蓝', en:'Sky' }
+];
+
+function applyWebTheme(primaryHex) {
+	if (!primaryHex) return;
+	document.documentElement.style.setProperty('--primary', primaryHex);
+	// 兼容 cacaview 样式体系的多个令牌
+	document.documentElement.style.setProperty('--accent', primaryHex);
+	document.documentElement.style.setProperty('--primary-color', primaryHex);
+}
+
+function renderThemeSwatches() {
+	var box = $('#themeSwatches');
+	if (box.length === 0) return;
+	var html = [];
+	THEME_PRESETS.forEach(function(p){
+		html.push('<div class="theme-swatch" data-id="' + p.id + '" data-hex="' + p.hex +
+			'" style="background:' + p.hex + '" title="' + p.zh + '"></div>');
+	});
+	box.html(html.join(''));
+	box.find('.theme-swatch').on('click', function(){
+		var id = $(this).data('id');
+		var hex = $(this).data('hex');
+		$.post('/theme', { accentId: id }, function(){
+			applyWebTheme(hex);
+			$('#themeCurrent').text(id);
+		});
+	});
+}
+
+function setupThemePanel() {
+	renderThemeSwatches();
+	// 启动时读盒子端当前主题色
+	$.get('/theme', function(t){
+		if (t && t.primary) {
+			applyWebTheme(t.primary);
+			$('#themeCurrent').text(t.custom ? t.primary : (t.accentId || '自定义'));
+		}
+	});
+	$('#btnThemeApply').on('click', function(){
+		var hex = $('#themeHexInput').val().trim();
+		if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+			$.post('/theme', { hex: hex }, function(){
+				applyWebTheme(hex);
+				$('#themeCurrent').text(hex);
+			});
+		} else if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
+			$.post('/theme', { hex: hex }, function(){
+				applyWebTheme(hex);
+				$('#themeCurrent').text(hex);
+			});
+		} else {
+			alert('请输入 #RRGGBB 格式的色值');
+		}
+	});
+	$('#btnThemeReset').on('click', function(){
+		$.post('/theme', { accentId: 'none' }, function(){
+			document.documentElement.style.removeProperty('--primary');
+			document.documentElement.style.removeProperty('--accent');
+			document.documentElement.style.removeProperty('--primary-color');
+			$('#themeCurrent').text('跟随盒子端');
+		});
+	});
+}
+
+// ==================== 语言切换（中/英，用户决策 D9） ====================
+
+var LANG = {
+	zh: {
+		'输入遥控':'输入遥控','触摸板':'触摸板','应用管理':'应用管理','文件管理':'文件管理','视频直播':'视频直播',
+		'输入':'输入','退格':'退格','清空':'清空','传送文件':'传送文件','清除缓存':'清除缓存',
+		'截屏':'截屏','每2秒刷新':'每2秒刷新','主题色':'主题色','应用':'应用','默认':'默认'
+	},
+	en: {
+		'输入遥控':'Remote','触摸板':'Touchpad','应用管理':'Apps','文件管理':'Files','视频直播':'Video',
+		'输入':'Send','退格':'Backspace','清空':'Clear','传送文件':'Upload','清除缓存':'Clear Cache',
+		'截屏':'Screenshot','每2秒刷新':'Refresh 2s','主题色':'Theme','应用':'Apply','默认':'Default'
+	}
+};
+var currentLang = localStorage.getItem('next_lang');
+if (!currentLang) currentLang = (navigator.language || 'zh').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+
+function applyLang() {
+	var dict = LANG[currentLang] || LANG.zh;
+	$('.tab-text').each(function(){
+		var el = $(this);
+		var orig = el.data('orig');
+		if (!orig) { orig = el.text(); el.data('orig', orig); }
+		el.text(dict[orig] !== undefined ? dict[orig] : orig);
+	});
+	$('#btnLang').text(currentLang === 'zh' ? 'EN' : '中文');
+	localStorage.setItem('next_lang', currentLang);
+}
+
+function setupLang() {
+	$('#btnLang').on('click', function(){
+		currentLang = currentLang === 'zh' ? 'en' : 'zh';
+		applyLang();
+	});
+	applyLang();
+}
+
 reloadAppList();
 loadFileList("");
 getDiskSpace();
@@ -573,6 +687,8 @@ loadTVList();
 loadTorrentItems();
 upgrade();
 setupScreenshot();
+setupThemePanel();
+setupLang();
 refreshChannelInfo();
 setInterval(function() {
 	upgrade()

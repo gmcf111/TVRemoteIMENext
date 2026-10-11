@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主题 Overlay（04 文档 5.2）：Activity onCreate 时按持久化选择 applyStyle
+         显式 parent（点标记隐式父在资源收缩下链接失败） -->
+    <style name="ThemeOverlay.Next.Purple" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_purple</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_purple</item>
+    </style>
+    <style name="ThemeOverlay.Next.Blue" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_blue</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_blue</item>
+    </style>
+    <style name="ThemeOverlay.Next.Teal" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_teal</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_teal</item>
+    </style>
+    <style name="ThemeOverlay.Next.Green" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_green</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_green</item>
+    </style>
+    <style name="ThemeOverlay.Next.Yellow" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_yellow</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_yellow</item>
+    </style>
+    <style name="ThemeOverlay.Next.Orange" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_orange</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_orange</item>
+    </style>
+    <style name="ThemeOverlay.Next.Red" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_red</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_red</item>
+    </style>
+    <style name="ThemeOverlay.Next.Pink" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_pink</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_pink</item>
+    </style>
+    <style name="ThemeOverlay.Next.Brown" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_brown</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_brown</item>
+    </style>
+    <style name="ThemeOverlay.Next.Skyblue" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">@color/next_theme_seed_skyblue</item>
+        <item name="colorSecondaryContainer">@color/next_theme_seed_skyblue</item>
+    </style>
+</resources>

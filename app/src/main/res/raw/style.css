@@ -1418,3 +1418,57 @@ body {
 	opacity: 0.6;
 	margin-top: 8px;
 }
+/* ==================== 主题色面板与语言切换（阶段 5） ==================== */
+.theme-panel {
+	margin-top: 12px;
+	border: 1px solid var(--color-border, #3C3C3C);
+	border-radius: 10px;
+	padding: 10px;
+}
+.theme-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+.theme-current {
+	font-size: 12px;
+	opacity: 0.6;
+}
+.theme-swatches {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+.theme-swatch {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	border: 2px solid rgba(255,255,255,0.25);
+	cursor: pointer;
+	transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.theme-swatch:hover {
+	transform: scale(1.12);
+	border-color: #fff;
+}
+.theme-custom-row {
+	display: flex;
+	gap: 8px;
+	margin-top: 10px;
+	align-items: center;
+}
+.theme-custom-row input {
+	flex: 1;
+	min-width: 0;
+}
+.lang-btn {
+	font-size: 12px;
+	padding: 2px 10px;
+	margin-left: 10px;
+	border-radius: 12px;
+	border: 1px solid var(--color-border, #3C3C3C);
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+}

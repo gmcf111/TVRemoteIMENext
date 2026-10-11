@@ -70,6 +70,7 @@ class RemoteServer(
             add(MouseRequestProcessor(context, this@RemoteServer))
             add(ChannelInfoRequestProcessor(context))
             add(ScreenshotRequestProcessor(context))
+            add(ThemeRequestProcessor(context))
             add(OtherGetRequestProcessor(context))
         }
     }
@@ -84,6 +85,7 @@ class RemoteServer(
             add(FileRequestProcessor(context))
             add(TVRequestProcessor(context))
             add(TorrentRequestProcessor(context))
+            add(ThemeRequestProcessor(context))
             add(OtherPostRequestProcessor(context))
         }
     }

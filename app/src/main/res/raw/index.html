@@ -19,6 +19,7 @@
 					<a href="#" target="_blank" id="newVerUrl" class="update-link" style="display:none;">
 						<span>最新版本：<span class="version-code" id="newVer">2.0.0</span></span>
 					</a>
+					<button type="button" id="btnLang" class="btn-secondary lang-btn" aria-label="切换语言">EN</button>
 				</div>
 			</div>
 		</header>
@@ -79,6 +80,20 @@
 				</div>
 				<img id="screenshotImg" class="screenshot-img" alt="电视画面" style="display:none;">
 				<div id="screenshotHint" class="screenshot-hint"></div>
+			</section>
+
+			<!-- Theme Color Panel -->
+			<section class="theme-panel">
+				<div class="theme-header">
+					<span class="screenshot-title">🎨 主题色</span>
+					<span class="theme-current" id="themeCurrent">跟随盒子端</span>
+				</div>
+				<div class="theme-swatches" id="themeSwatches"></div>
+				<div class="theme-custom-row">
+					<input type="text" id="themeHexInput" placeholder="#6750A4" maxlength="7" aria-label="自定义色值">
+					<button type="button" class="btn-secondary" id="btnThemeApply">应用</button>
+					<button type="button" class="btn-secondary" id="btnThemeReset">默认</button>
+				</div>
 			</section>
 
 			<!-- Text Input Panel -->
