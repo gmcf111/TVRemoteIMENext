@@ -24,13 +24,6 @@
 ./gradlew lint
 ```
 
-APK 通过 GitHub Releases 分发，或本地 adb 安装：
-
-```
-adb install app-debug.apk
-adb shell ime set com.tvremoteime.next/.IMEService
-```
-
 ## 仓库结构
 
 ```
@@ -39,10 +32,6 @@ adb-lib/      ADB 协议库（Kotlin 重写）
 ijkplayer/    ijkplayer 播放封装（so 原样保留，Java 层 AndroidX 化）
 thunder/      迅雷下载封装（Java + so 原样保留，GPL v2 义务随源分发）
 ```
-
-## 说明
-
-- 本项目仅 32 位（v7a）：纯 64 位新机型（Pixel 7+ 等）无法安装，非目标设备
 
 ## 致谢
 
