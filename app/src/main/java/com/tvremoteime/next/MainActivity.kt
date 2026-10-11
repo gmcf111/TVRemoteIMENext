@@ -41,6 +41,8 @@ class MainActivity : Activity(), View.OnClickListener {
         findViewById<View>(R.id.btnStartService).setOnClickListener(this)
         findViewById<View>(R.id.btnSetDLNA).setOnClickListener(this)
 
+        initRootSwitch()
+
         title = resources.getString(R.string.app_name) + "  V" + AppPackagesHelper.getCurrentPackageVersion(this)
         dlnaNameText?.setText(DLNAUtils.getDLNANameSuffix(applicationContext))
 
@@ -60,6 +62,34 @@ class MainActivity : Activity(), View.OnClickListener {
                 != android.content.pm.PackageManager.PERMISSION_GRANTED
             ) {
                 requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 100)
+            }
+        }
+    }
+
+    /** 阶段 4：Root 增强开关（用户 opt-in，02 文档） */
+    private fun initRootSwitch() {
+        val rootSwitch = findViewById<android.widget.Switch>(R.id.swRoot)
+        val rootStatus = findViewById<TextView>(R.id.tvRootStatus)
+        com.tvremoteime.next.control.ControlCenter.init(this)
+        val root = com.tvremoteime.next.control.ControlCenter.root()
+
+        rootSwitch.isChecked = com.tvremoteime.next.control.RootPrefs.isEnabled(this)
+        rootStatus.text = root?.describeStatus() ?: "未初始化"
+
+        rootSwitch.setOnCheckedChangeListener { _, isChecked ->
+            com.tvremoteime.next.control.RootPrefs.setEnabled(this, isChecked)
+            root?.invalidateCache()
+            if (isChecked) {
+                // 后台探测，避免主线程卡顿
+                Thread {
+                    val ok = root?.isAvailable() == true
+                    runOnUiThread {
+                        rootStatus.text = if (ok) "可用（su 已授权）" else "已开启但 su 不可用"
+                        if (ok) Env.toast(this, "Root 增强已启用")
+                    }
+                }.start()
+            } else {
+                rootStatus.text = "未开启"
             }
         }
     }

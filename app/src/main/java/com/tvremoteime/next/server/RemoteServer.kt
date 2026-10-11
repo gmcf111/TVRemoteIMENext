@@ -68,6 +68,8 @@ class RemoteServer(
             add(AppIconRequestProcessor(context))
             add(TVRequestProcessor(context))
             add(MouseRequestProcessor(context, this@RemoteServer))
+            add(ChannelInfoRequestProcessor(context))
+            add(ScreenshotRequestProcessor(context))
             add(OtherGetRequestProcessor(context))
         }
     }

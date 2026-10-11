@@ -507,12 +507,73 @@ function upgrade() {
 		$('#curVer').html(version);
 	});
 }
+
+// ==================== 通道状态与截屏（Root 增强，阶段 4） ====================
+
+var channelInfoCache = null;
+
+function renderChannelBadges(info) {
+	var badges = $('#channel-badges');
+	if (badges.length === 0) return;
+	var names = { root:'Root', ime:'IME', a11y:'辅助', adb:'ADB' };
+	var html = [];
+	html.push('<span class="badge-title">通道：</span>');
+	['root','ime','a11y','adb'].forEach(function(id){
+		var ch = info[id] || {};
+		var on = ch.available === true;
+		html.push('<span class="channel-badge ' + (on?'on':'off') + '">' + (names[id]||id) + '</span>');
+	});
+	badges.html(html.join(''));
+}
+
+function refreshChannelInfo() {
+	$.get('/channel-info', function(info){
+		channelInfoCache = info;
+		renderChannelBadges(info);
+		var rootAvailable = info.root && info.root.available === true;
+		if (rootAvailable) {
+			$('#screenshot-panel').show();
+		} else {
+			$('#screenshot-panel').hide();
+			if (info.root && info.root.enabled === true && rootAvailable !== true) {
+				$('#screenshotHint').text('Root 已开启但 su 不可用，截屏不可用');
+			} else {
+				$('#screenshotHint').text('未开启 Root 增强，如需截屏请在盒子端应用主页开启');
+			}
+		}
+	}).fail(function(){
+		$('#screenshot-panel').hide();
+	});
+}
+
+var screenshotTimer = null;
+
+function takeScreenshot() {
+	var ts = new Date().getTime();
+	$('#screenshotImg').attr('src', '/screenshot?t=' + ts).show();
+	$('#screenshotHint').text('');
+}
+
+function setupScreenshot() {
+	$('#btnScreenshot').on('click', takeScreenshot);
+	$('#cbAutoRefresh').on('change', function(){
+		if (this.checked) {
+			screenshotTimer = setInterval(takeScreenshot, 2000);
+			takeScreenshot();
+		} else {
+			if (screenshotTimer) { clearInterval(screenshotTimer); screenshotTimer = null; }
+		}
+	});
+}
+
 reloadAppList();
 loadFileList("");
 getDiskSpace();
 loadTVList();
 loadTorrentItems();
 upgrade();
+setupScreenshot();
+refreshChannelInfo();
 setInterval(function() {
 	upgrade()
 }, 18e5);

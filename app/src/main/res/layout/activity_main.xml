@@ -140,6 +140,35 @@
                 android:layout_height="38dp"
                 android:text="设置"/>
         </LinearLayout>
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#ffffff"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="5dp"
+            />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Root 增强（截屏/静默安装/触控补位）"
+                android:textColor="@color/white" />
+            <Switch
+                android:id="@+id/swRoot"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="10dp" />
+            <TextView
+                android:id="@+id/tvRootStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="10dp"
+                android:textColor="@color/gray"
+                android:text="" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

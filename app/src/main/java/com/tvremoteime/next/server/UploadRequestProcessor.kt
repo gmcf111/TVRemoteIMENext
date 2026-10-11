@@ -28,7 +28,16 @@ class UploadRequestProcessor(private val context: Context) : RequestProcessor {
         val localFilename = files["file"]
         if (!uploadFileName.isNullOrEmpty() && !localFilename.isNullOrEmpty() && autoInstall) {
             if (localFilename.endsWith(".apk")) {
-                AppPackagesHelper.installPackage(File(localFilename), context)
+                // Root 开启且可用 → 静默安装；否则弹系统安装器（旧版行为）
+                val root = com.tvremoteime.next.control.ControlCenter.root()
+                if (root != null && root.isAvailable()) {
+                    val error = root.silentInstall(localFilename)
+                    if (error != null) {
+                        AppPackagesHelper.installPackage(File(localFilename), context)
+                    }
+                } else {
+                    AppPackagesHelper.installPackage(File(localFilename), context)
+                }
             } else if (FileUtils.isMediaFile(localFilename)) {
                 VideoPlayHelper.playUrl(context, localFilename, 0, params["useSystem"] == "true")
             }

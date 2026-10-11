@@ -64,6 +64,21 @@
 					<div class="control-btn vol1-btn" id="vol1-btn" data-key='24' data-bp='-711px -379px' aria-label="Volume Up"></div>
 					<div class="control-btn vol2-btn" id="vol2-btn" data-key='25' data-bp='-711px -379px' aria-label="Volume Down"></div>
 				</div>
+				<div id="channel-badges" class="channel-badges"></div>
+			</section>
+
+			<!-- Screenshot Panel (Root) -->
+			<section class="screenshot-panel" id="screenshot-panel" style="display:none;">
+				<div class="screenshot-header">
+					<span class="screenshot-title">🖥️ 电视截屏</span>
+					<button type="button" class="btn-secondary" id="btnScreenshot">截屏</button>
+					<label class="checkbox-label">
+						<input type="checkbox" id="cbAutoRefresh">
+						<span>每2秒刷新</span>
+					</label>
+				</div>
+				<img id="screenshotImg" class="screenshot-img" alt="电视画面" style="display:none;">
+				<div id="screenshotHint" class="screenshot-hint"></div>
 			</section>
 
 			<!-- Text Input Panel -->

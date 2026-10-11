@@ -63,6 +63,13 @@ class IMEService : InputMethodService(), View.OnClickListener {
     override fun onCreate() {
         super.onCreate()
         Env.initToastHandler()
+        com.tvremoteime.next.control.ControlCenter.init(this)
+        com.tvremoteime.next.control.ImeChannel.imeAvailable = true
+        com.tvremoteime.next.control.ImeChannel.imeTextHook = { text -> commitText(text) }
+        com.tvremoteime.next.control.ImeChannel.imeKeyHook = { keyCode ->
+            sendKeyCode(keyCode)
+            true
+        }
         ServerFileManager.resetBaseDir(this)
         startRemoteServer()
         DLNAUtils.startDLNAService(applicationContext)
@@ -130,7 +137,15 @@ class IMEService : InputMethodService(), View.OnClickListener {
                                 val eventTime = SystemClock.uptimeMillis()
                                 val ic = currentInputConnection
                                 when (keyAction) {
-                                    KEY_ACTION_PRESSED -> if (!isSendToAdbService(kc)) sendKeyCode(kc)
+                                    KEY_ACTION_PRESSED -> {
+                                        // 02 文档按键域优先级：Root → IME → ADB
+                                        val root = com.tvremoteime.next.control.ControlCenter.root()
+                                        if (root != null && root.isAvailable()) {
+                                            root.sendKey(kc)
+                                        } else if (!isSendToAdbService(kc)) {
+                                            sendKeyCode(kc)
+                                        }
+                                    }
                                     KEY_ACTION_DOWN -> {
                                         if (!isSendToAdbService(kc) && ic != null) {
                                             ic.sendKeyEvent(
@@ -158,7 +173,15 @@ class IMEService : InputMethodService(), View.OnClickListener {
                 }
 
                 override fun onTextReceived(text: String) {
-                    if (!isSendToAdbService(text)) commitText(text)
+                    // 02 文档文字域：IME 激活时优先 IME（最快），否则 Root，最后 ADB
+                    if (!commitText(text)) {
+                        val root = com.tvremoteime.next.control.ControlCenter.root()
+                        if (root != null && root.isAvailable()) {
+                            root.sendText(text)
+                        } else {
+                            isSendToAdbService(text)
+                        }
+                    }
                 }
             }
             try {
@@ -204,6 +227,9 @@ class IMEService : InputMethodService(), View.OnClickListener {
     }
 
     override fun onDestroy() {
+        com.tvremoteime.next.control.ImeChannel.imeAvailable = false
+        com.tvremoteime.next.control.ImeChannel.imeTextHook = null
+        com.tvremoteime.next.control.ImeChannel.imeKeyHook = null
         if (mServer != null && mServer!!.starting) {
             Log.i(TAG, "远程输入服务已停止！")
             mServer?.stop()
