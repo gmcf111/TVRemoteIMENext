@@ -13,7 +13,7 @@
 |---|---|
 | 语言 | Kotlin（业务层 100%），thunder JNI 参数类保持 Java |
 | minSdk / targetSdk | 19（Android 4.4）/ 35 |
-| ABI | **仅 armeabi-v7a**（32 位盒子生态，见文档） |
+| ABI | **仅 armeabi-v7a**（32 位盒子生态） |
 | UI | Material Components（View 体系），主题色可自定义 |
 | 构建 | Gradle 8.13 / AGP 8.13.2 / JDK 17 |
 
@@ -42,6 +42,9 @@ thunder/      迅雷下载封装（Java + so 原样保留，GPL v2 义务随源�
 
 ## 说明
 
-- 控制端无访问密码，仅限可信局域网使用（设计决策，见文档）
-- 直播源 tv.txt 默认置空，路径：`/Android/data/com.tvremoteime.next/files/tv.txt`
 - 本项目仅 32 位（v7a）：纯 64 位新机型（Pixel 7+ 等）无法安装，非目标设备
+
+## 致谢
+
+- [kingthy/TVRemoteIME](https://gitee.com/kingthy/TVRemoteIME)：本项目上游，感谢原作者的无私分享
+- [cacaview/TVRemoteIME](https://github.com/cacaview/TVRemoteIME)：触控板功能的来源，感谢贡献
