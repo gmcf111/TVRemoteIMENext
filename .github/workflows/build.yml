@@ -21,6 +21,16 @@ jobs:
 
       # ubuntu-latest 预装 Android SDK（platforms;android-35 + build-tools），无需额外 setup
 
+      - name: Warm up Gradle distribution
+        run: |
+          ok=""
+          for i in 1 2 3 4; do
+            if ./gradlew --version; then ok=1; break; fi
+            echo "::warning::Gradle distribution download failed (attempt $i), retrying..."
+            sleep 20
+          done
+          [ -n "$ok" ] || { echo "::error::Gradle distribution download failed after 4 attempts"; exit 1; }
+
       - name: Build debug APK
         run: ./gradlew assembleDebug lintDebug --stacktrace
 
