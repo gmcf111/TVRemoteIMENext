@@ -1,7 +1,5 @@
 # TVRemoteIMENext（小盒精灵Next）
 
-[![build](https://github.com/gmcf111/TVRemoteIMENext/actions/workflows/build.yml/badge.svg)](https://github.com/gmcf111/TVRemoteIMENext/actions/workflows/build.yml)
-
 通过浏览器遥控电视盒子的安卓应用：输入法（IME）+ HTTP 控制服务 + 触控板 + DLNA 投屏 + 边下边播（迅雷 P2SP/BT/ED2K）+ 可选 Root 增强。**Kotlin 重写版 v2.0.0**。
 
 - 上游：[kingthy/TVRemoteIME](https://gitee.com/kingthy/TVRemoteIME) v1.4.1（GPL v2），融合 [cacaview/TVRemoteIME](https://github.com/cacaview/TVRemoteIME) 的触控板功能
