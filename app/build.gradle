@@ -7,6 +7,27 @@ android {
     namespace 'com.tvremoteime.next'
     compileSdk libs.versions.compileSdk.get().toInteger()
 
+    // 正式签名配置（07 文档 3.1）：
+    // CI 由 release workflow 注入 keystore.properties（来自 Actions secrets）；
+    // 本地无该文件时回落 debug 签名，保证 assembleRelease 始终可跑（自用场景）。
+    def keystorePropsFile = rootProject.file('keystore.properties')
+    def hasReleaseKeystore = keystorePropsFile.exists()
+    def keystoreProps = new Properties()
+    if (hasReleaseKeystore) {
+        keystorePropsFile.withInputStream { keystoreProps.load(it) }
+    }
+
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+
     defaultConfig {
         applicationId "com.tvremoteime.next"
         minSdk libs.versions.minSdk.get().toInteger()
@@ -29,8 +50,8 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // debug 签名自用（用户决策 D12），正式发布前提醒用户配置 release keystore
-            signingConfig signingConfigs.debug
+            // 有正式 keystore 用正式签名；否则回落 debug（本地自用，D12）
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
 
