@@ -59,7 +59,6 @@ class RemoteServer(
             add(RawRequestProcessor(context, "/style.css", R.raw.style, "text/css"))
             add(RawRequestProcessor(context, "/jquery_min.js", R.raw.jquery_min, "application/x-javascript"))
             add(RawRequestProcessor(context, "/ime_core.js", R.raw.ime_core, "application/x-javascript"))
-            add(RawRequestProcessor(context, "/keys.png", R.raw.keys, "image/png"))
             add(RawRequestProcessor(context, "/ic_dl_folder.png", R.raw.ic_dl_folder, "image/png"))
             add(RawRequestProcessor(context, "/ic_dl_other.png", R.raw.ic_dl_other, "image/png"))
             add(RawRequestProcessor(context, "/ic_dl_video.png", R.raw.ic_dl_video, "image/png"))

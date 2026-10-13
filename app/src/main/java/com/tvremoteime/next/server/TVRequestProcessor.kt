@@ -13,7 +13,8 @@ import java.io.OutputStreamWriter
  * 电视直播源端点（对应旧版 TVRequestProcesser.java）
  *
  * GET  /tv.txt → 读取直播源
- * POST /tv.txt {text} → 保存直播源
+ * POST /tv.txt {text} → 保存直播源（编辑保存）
+ * POST /tv.txt multipart file → 上传直播源文件覆盖（2026-10 新增，Web 端"上传直播源"按钮）
  *
  * 与旧版差异（用户决策 D8）：不再内置默认源（旧版从 R.raw.tv 拷贝 2018 年失效源）。
  * 文件不存在时返回空内容。
@@ -34,12 +35,25 @@ class TVRequestProcessor(private val context: Context) : RequestProcessor {
     ): NanoHTTPD.Response {
         return if (session.method == NanoHTTPD.Method.POST) {
             try {
-                val text = params["text"] ?: ""
-                OutputStreamWriter(FileOutputStream(tvFile), "utf-8").use { it.write(text) }
-                RemoteServer.createPlainTextResponse(NanoHTTPD.Response.Status.OK, "ok")
+                val uploaded = files["file"]
+                if (!uploaded.isNullOrEmpty()) {
+                    // 上传直播源文件：整体覆盖 tv.txt
+                    File(uploaded).copyTo(tvFile, overwrite = true)
+                    RemoteServer.createJSONResponse(
+                        NanoHTTPD.Response.Status.OK,
+                        "{\"success\":true}"
+                    )
+                } else {
+                    val text = params["text"] ?: ""
+                    OutputStreamWriter(FileOutputStream(tvFile), "utf-8").use { it.write(text) }
+                    RemoteServer.createPlainTextResponse(NanoHTTPD.Response.Status.OK, "ok")
+                }
             } catch (e: Exception) {
                 Log.e(Env.TAG, "POST /tv.txt", e)
-                RemoteServer.createPlainTextResponse(NanoHTTPD.Response.Status.OK, "fail")
+                RemoteServer.createJSONResponse(
+                    NanoHTTPD.Response.Status.OK,
+                    "{\"success\":false}"
+                )
             }
         } else {
             try {
