@@ -21,7 +21,5 @@ dependencies {
     // ijkplayer-java/exo 只在 jcenter 发布过（已停服），经阿里云 jcenter 镜像解析；0.8.4 为旧工程同款版本
     api 'tv.danmaku.ijk.media:ijkplayer-java:0.8.4'
     api 'tv.danmaku.ijk.media:ijkplayer-exo:0.8.4'
-    implementation project(':thunder')
     implementation libs.androidx.annotation
-    implementation libs.androidx.recyclerview
 }

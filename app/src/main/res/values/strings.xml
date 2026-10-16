@@ -6,4 +6,6 @@
     <string name="step2">第二步：设置「小盒精灵Next」为系统默认输入法</string>
     <string name="activity_main_title">小盒精灵 Next</string>
     <string name="accessibility_service_description">开启后，手机浏览器可向电视发送触控板鼠标操作（移动光标、点击、滑动、滚轮），用于远程遥控电视盒子。</string>
+    <string name="remote_service_channel">远程控制服务</string>
+    <string name="remote_service_running">局域网遥控与投屏服务运行中</string>
 </resources>

@@ -15,22 +15,24 @@ import com.tvremoteime.next.core.Env
 class AdbChannel : ControlChannel {
 
     override val id: String = "adb"
-    override val capabilities: Set<Capability> = setOf(Capability.KEY, Capability.TEXT)
+    override val capabilities: Set<Capability> = setOf(Capability.KEY, Capability.TEXT, Capability.TOUCH, Capability.SWIPE, Capability.SCROLL)
 
     override fun isAvailable(): Boolean {
         val helper = AdbHelper.getInstance() ?: return false
-        return helper.isRunning
+        return helper.isConnected
     }
 
     fun sendKey(keyCode: Int): Boolean {
         val helper = AdbHelper.getInstance() ?: return false
-        helper.sendData(keyCode)
-        return true
+        return helper.sendData(keyCode)
     }
 
     fun sendText(text: String): Boolean {
         val helper = AdbHelper.getInstance() ?: return false
-        helper.sendData(text)
-        return true
+        return helper.sendData(text)
     }
+
+    fun tap(x: Int, y: Int): Boolean = AdbHelper.getInstance()?.sendShell("input tap $x $y") == true
+    fun swipe(x: Int, y: Int, endX: Int, endY: Int, duration: Int): Boolean =
+        AdbHelper.getInstance()?.sendShell("input swipe $x $y $endX $endY $duration") == true
 }

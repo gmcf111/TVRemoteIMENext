@@ -28,7 +28,10 @@ public class AdbStream implements Closeable {
 	private Queue<byte[]> readQueue;
 	
 	/** Indicates whether the connection is closed already */
-	private boolean isClosed;
+	private volatile boolean isClosed;
+	private volatile boolean opened;
+
+	boolean isOpen() { return opened; }
 	
 	/**
 	 * Creates a new AdbStream object on the specified AdbConnection
@@ -77,6 +80,7 @@ public class AdbStream implements Closeable {
 	void updateRemoteId(int remoteId)
 	{
 		this.remoteId = remoteId;
+		this.opened = true;
 	}
 	
 	/**
@@ -116,11 +120,12 @@ public class AdbStream implements Closeable {
 		
 		synchronized (readQueue) {
 			/* Wait for the connection to close or data to be received */
-			while (!isClosed && (data = readQueue.poll()) == null) {
-				readQueue.wait();
+			while ((data = readQueue.poll()) == null && !isClosed) {
+				readQueue.wait(10000);
+				if (readQueue.isEmpty() && !isClosed) throw new java.net.SocketTimeoutException("ADB read timed out");
 			}
 			
-			if (isClosed) {
+			if (data == null && isClosed) {
 				throw new IOException("Stream closed");
 			}
 		}

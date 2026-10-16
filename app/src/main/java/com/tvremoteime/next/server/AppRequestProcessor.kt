@@ -35,7 +35,10 @@ class AppRequestProcessor(private val context: Context) : RequestProcessor {
                 AppPackagesHelper.getQueryAppInfoJsonString(context, params["system"] == "true")
             )
             "/uninstall" -> {
-                params["packageName"]?.let { AppPackagesHelper.uninstallPackage(it, context) }
+                params["packageName"]?.let {
+                    val root = com.tvremoteime.next.control.ControlCenter.root()
+                    if (root?.isAvailable() != true || root.silentUninstall(it) != null) AppPackagesHelper.uninstallPackage(it, context)
+                }
                 ok
             }
             "/run" -> {

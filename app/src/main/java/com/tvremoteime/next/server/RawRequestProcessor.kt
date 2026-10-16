@@ -24,14 +24,9 @@ class RawRequestProcessor(
         files: Map<String, String>
     ): NanoHTTPD.Response {
         return try {
-            context.resources.openRawResource(resourceId).use { input ->
-                NanoHTTPD.newFixedLengthResponse(
-                    NanoHTTPD.Response.Status.OK,
-                    "$mimeType; charset=utf-8",
-                    input,
-                    input.available().toLong()
-                )
-            }
+            // Response 在 serve 返回后才发送并关闭流，不能在这里 use/close。
+            val input = context.resources.openRawResource(resourceId)
+            NanoHTTPD.newChunkedResponse(NanoHTTPD.Response.Status.OK, mimeType, input)
         } catch (e: IOException) {
             RemoteServer.createPlainTextResponse(
                 NanoHTTPD.Response.Status.INTERNAL_ERROR,

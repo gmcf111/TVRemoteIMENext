@@ -42,12 +42,16 @@ class MainActivity : Activity(), View.OnClickListener {
     private var dlnaNameText: EditText? = null
     private var serviceBadge: TextView? = null
     private var accentPreview: View? = null
+    private var appliedAccent: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 主题色叠加（04 文档 5.2：setContentView 之前）
         ThemeHelper.applyTheme(this)
+        appliedAccent = ThemePrefs.getAccentIdOrHex(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        ThemeHelper.injectCustomAccent(this, findViewById(R.id.btnUseIME), findViewById(R.id.btnSetIME),
+            findViewById(R.id.btnOpenA11y), findViewById(R.id.btnStartService), findViewById(R.id.btnSetDLNA), findViewById(R.id.btnPickColor))
 
         qrCodeImage = findViewById(R.id.ivQRCode)
         addressView = findViewById(R.id.tvAddress)
@@ -69,10 +73,16 @@ class MainActivity : Activity(), View.OnClickListener {
         ControlCenter.init(this)
         initRootSwitch()
         requestStorageIfNeeded()
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+        }
+        com.tvremoteime.next.update.AutoUpdateManager(this, android.os.Handler(android.os.Looper.getMainLooper()))
     }
 
     override fun onResume() {
         super.onResume()
+        if (appliedAccent != ThemePrefs.getAccentIdOrHex(this)) { recreate(); return }
         refreshAll()
     }
 
@@ -82,6 +92,16 @@ class MainActivity : Activity(), View.OnClickListener {
                 openInputMethodSettings()
             }
             R.id.btnSetIME -> {
+                val root = ControlCenter.root()
+                if (root?.isAvailable() == true) {
+                    Thread {
+                        val success = root.setDefaultIme()
+                        runOnUiThread {
+                            if (success) refreshAll() else openInputMethodSettings()
+                        }
+                    }.start()
+                    return
+                }
                 if (!Env.isEnableIME(this)) {
                     Env.toast(applicationContext, "请先激活启用输入法")
                     openInputMethodSettings()
@@ -104,12 +124,9 @@ class MainActivity : Activity(), View.OnClickListener {
                 }
             }
             R.id.btnStartService -> {
-                startService(Intent(IMEService.ACTION))
-                if (!Env.isDefaultIME(this)) {
-                    if (AdbHelper.getInstance() == null) AdbHelper.createInstance()
-                }
-                Env.toast(applicationContext, "服务已手动启动")
-                refreshAll()
+                val started = com.tvremoteime.next.server.RemoteControlService.start(this)
+                Env.toast(applicationContext, if (started) "正在启动服务" else "服务启动失败，请查看日志")
+                window.decorView.postDelayed({ refreshAll() }, 500)
             }
             R.id.btnSetDLNA -> {
                 dlnaNameText?.text?.toString()?.let {
@@ -148,8 +165,8 @@ class MainActivity : Activity(), View.OnClickListener {
             if (a11yOn) "✅ 辅助功能已开启（触控板可用）" else "⬜ 辅助功能未开启（触控板）"
 
         findViewById<TextView>(R.id.tvServiceState).text =
-            if (imeDefault || a11yOn) "服务运行中" else "服务未运行"
-        serviceBadge?.text = if (imeDefault || a11yOn) "运行中" else "未运行"
+            if (com.tvremoteime.next.server.RemoteControlService.isRunning) "服务运行中" else "服务未运行"
+        serviceBadge?.text = if (com.tvremoteime.next.server.RemoteControlService.isRunning) "运行中" else "未运行"
     }
 
     private fun refreshChannelSummary() {
@@ -158,7 +175,7 @@ class MainActivity : Activity(), View.OnClickListener {
         val rootOn = root?.isAvailable() == true
         val imeOn = Env.isDefaultIME(this)
         val a11yOn = MouseAccessibilityService.isServiceEnabled()
-        val adbOn = AdbHelper.getInstance()?.isRunning == true
+        val adbOn = AdbHelper.getInstance()?.isConnected == true
         val sb = StringBuilder()
         sb.append("按键: ").append(when {
             rootOn -> "Root"
@@ -204,7 +221,7 @@ class MainActivity : Activity(), View.OnClickListener {
             root?.invalidateCache()
             if (isChecked) {
                 Thread {
-                    val ok = root?.isAvailable() == true
+                    val ok = root?.probe() == true
                     runOnUiThread {
                         rootState.text = if (ok) "Root 增强：可用（su 已授权）" else "Root 增强：已开启但 su 不可用"
                         refreshChannelSummary()
@@ -231,6 +248,8 @@ class MainActivity : Activity(), View.OnClickListener {
         }
         ThemePrefs.presets.forEach { preset ->
             val swatch = View(this).apply {
+                isFocusable = true
+                contentDescription = preset.nameZh
                 val size = 120
                 layoutParams = GridLayout.LayoutParams().apply {
                     width = size

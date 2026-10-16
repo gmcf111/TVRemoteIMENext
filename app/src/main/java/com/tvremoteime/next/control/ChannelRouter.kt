@@ -15,6 +15,16 @@ class ChannelRouter(private val channels: List<ControlChannel>) {
 
     fun channel(id: String): ControlChannel? = byId[id]
 
+    /** 执行失败也继续降级；ADB 最后一次按需重连。 */
+    fun execute(capability: Capability, action: (ControlChannel) -> Boolean): Boolean {
+        for (id in priorityChain(capability)) {
+            val channel = byId[id] ?: continue
+            if (capability !in channel.capabilities) continue
+            if ((channel.isAvailable() || id == "adb") && action(channel)) return true
+        }
+        return false
+    }
+
     /** 按能力域择优：返回第一个可用的通道，全部不可用返回 null */
     fun pick(capability: Capability, prefer: String? = null): ControlChannel? {
         prefer?.let { p ->

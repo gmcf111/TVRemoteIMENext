@@ -32,7 +32,7 @@ jobs:
           [ -n "$ok" ] || { echo "::error::Gradle distribution download failed after 4 attempts"; exit 1; }
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug lintDebug --stacktrace
+        run: ./gradlew assembleDebug :app:testDebugUnitTest :adb-lib:testDebugUnitTest lintDebug --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

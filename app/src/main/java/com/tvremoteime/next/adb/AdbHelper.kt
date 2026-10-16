@@ -6,170 +6,133 @@ import com.cgutman.adblib.AdbBase64
 import com.cgutman.adblib.AdbConnection
 import com.cgutman.adblib.AdbCrypto
 import com.cgutman.adblib.Base64
+import com.tvremoteime.next.control.ShellCommands
 import com.tvremoteime.next.core.Env
-import com.tvremoteime.next.server.RemoteServer
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.IOException
+import java.net.InetSocketAddress
 import java.net.Socket
-import java.security.NoSuchAlgorithmException
-import java.util.ArrayDeque
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
-/**
- * ADB 通道（对应旧版 AdbHelper.java）
- *
- * 通过本机回环 adbd（127.0.0.1:5555）发送 input keyevent/text。
- * 四通道架构（02 文档）中阶段 3 将重构为 AdbChannel，
- * 本阶段保持与旧版等价的行为以先恢复功能。
- */
+/** 回环 ADB：单线程 FIFO 执行，持久化认证密钥，命令与普通输入文字类型分离。 */
 class AdbHelper private constructor() {
-    private var connection: AdbConnection? = null
-    private var host: String? = null
-    private var port = 0
-
-    private val sendDataDeque = ArrayDeque<Any>()
-    private val dequeMonitor = Object()
-    private var sendDataThread: Thread? = null
-
-    @Volatile
-    private var running = false
+    @Volatile private var connection: AdbConnection? = null
+    @Volatile private var socket: Socket? = null
+    @Volatile private var executor: ExecutorService? = null
+    @Volatile private var connected = false
     private var context: Context? = null
+    private var host = "127.0.0.1"
+    private var port = 5555
 
-    val isRunning: Boolean get() = running
+    val isRunning: Boolean get() = executor?.isShutdown == false
+    val isConnected: Boolean get() = connected
 
+    @Synchronized
     fun init(context: Context, host: String, port: Int) {
-        this.context = context
+        if (isRunning) return
+        this.context = context.applicationContext
         this.host = host
         this.port = port
-        this.running = true
-        initSendThread()
+        executor = Executors.newSingleThreadExecutor { Thread(it, "adb-commands") }.also {
+            it.execute { connect() }
+        }
     }
 
+    @Synchronized
     fun stop() {
-        running = false
-        context = null
-        try {
-            connection?.close()
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
+        executor?.shutdownNow()
+        executor = null
+        disconnect()
+    }
+
+    private fun disconnect() {
+        connected = false
+        val old = connection
         connection = null
-        synchronized(dequeMonitor) { dequeMonitor.notifyAll() }
-        sendDataThread?.let {
-            if (it.isAlive) {
-                it.interrupt()
-                try {
-                    it.join()
-                } catch (ignored: InterruptedException) {
-                }
-            }
-        }
+        try { socket?.close() } catch (_: IOException) { }
+        try { old?.close() } catch (_: IOException) { }
     }
 
-    private fun initSendThread() {
-        if (sendDataThread == null || sendDataThread?.isAlive != true) {
-            sendDataThread = Thread {
-                var data: Any
-                while (running) {
-                    synchronized(dequeMonitor) {
-                        try {
-                            if (sendDataDeque.isEmpty()) dequeMonitor.wait()
-                        } catch (e: InterruptedException) {
-                        }
-                        data = if (sendDataDeque.isNotEmpty()) {
-                            sendDataDeque.pop()
-                        } else continue
-                    }
-                    val msg = if (data is Int) {
-                        "shell:input keyevent ${(data as Int).toString()}"
-                    } else {
-                        "shell:input text \"" + (data as String)
-                            .replace("\"", "\\\"")
-                            .replace("\\", "\\\\") + "\""
-                    }
-                    try {
-                        if (connection != null || try2Connect()) {
-                            connection?.open(msg)
-                            Env.debug("已成功发送adb命令：$msg")
-                        } else {
-                            Env.debug("未发送adb命令：$msg")
-                        }
-                    } catch (e: Exception) {
-                        Env.debug("发送adb命令时出错：$msg", e)
-                    }
-                }
-            }.also { it.start() }
-        }
-    }
-
-    private fun try2Connect(): Boolean {
+    private fun connect(): Boolean {
+        if (connected) return true
+        val app = context ?: return false
+        disconnect()
         return try {
-            val socket = Socket(host, port)
-            socket.soTimeout = 1000 * 10
-            var crypto: AdbCrypto? = null
-            try {
-                crypto = AdbCrypto.generateAdbKeyPair(AdbBase64 { data -> Base64.encodeToString(data, 16) })
-            } catch (e: NoSuchAlgorithmException) {
-                e.printStackTrace()
+            val transport = Socket()
+            socket = transport
+            transport.connect(InetSocketAddress(host, port), 3000)
+            transport.soTimeout = 10000
+            val base64 = AdbBase64 { Base64.encodeToString(it, 16) }
+            val privateKey = File(app.filesDir, "adbkey")
+            val publicKey = File(app.filesDir, "adbkey.pub")
+            val crypto = try {
+                AdbCrypto.loadAdbKeyPair(base64, privateKey, publicKey)
+            } catch (_: Exception) {
+                AdbCrypto.generateAdbKeyPair(base64).also { it.saveAdbKeyPair(privateKey, publicKey) }
             }
-            val appContext = context
-            if (connection == null) {
-                connection = AdbConnection.create(socket, crypto)
-                connection?.setOnClosedListener {
-                    Log.i(TAG, "adb已断开连接。")
-                    appContext?.let {
-                        Env.toastInHandler(it, it.getString(com.tvremoteime.next.R.string.app_name) + "和adb服务已断开连接。")
-                    }
-                    try {
-                        connection?.close()
-                        connection = null
-                    } catch (e: IOException) {
-                        e.printStackTrace()
-                    }
-                }
+            val candidate = AdbConnection.create(transport, crypto)
+            connection = candidate
+            candidate.setOnClosedListener {
+                if (connection === candidate) connected = false
+                try { candidate.close() } catch (_: IOException) { }
             }
-            connection?.connect()
-            Log.i(TAG, "adb已连接成功。")
-            appContext?.let {
-                Env.toastInHandler(it, it.getString(com.tvremoteime.next.R.string.app_name) + "和adb服务已连接成功。")
-            }
+            candidate.connect()
+            connected = true
             true
-        } catch (e: Exception) {
-            Log.e(TAG, "adb连接失败，错误信息。${e}", e)
-            connection = null
+        } catch (error: Exception) {
+            disconnect()
+            Log.w(TAG, "ADB connection unavailable", error)
             false
         }
     }
 
-    fun sendData(data: Any) {
-        sendDataDeque.push(data)
-        synchronized(dequeMonitor) { dequeMonitor.notifyAll() }
+    fun sendData(data: Any): Boolean = when (data) {
+        is Int -> sendShell("input keyevent $data")
+        is String -> sendShell(ShellCommands.text(data))
+        else -> false
+    }
+
+    fun sendShell(command: String): Boolean {
+        val worker = executor ?: return false
+        if (worker.isShutdown) return false
+        val task = try {
+            worker.submit<Boolean> {
+                if (!connect()) return@submit false
+                val output = ByteArrayOutputStream()
+                try {
+                    connection!!.open("shell:$command; echo __TVREMOTE_STATUS__:\$?").use { stream ->
+                        try {
+                            while (true) output.write(stream.read())
+                        } catch (_: IOException) { }
+                    }
+                    output.toString("UTF-8").trimEnd().endsWith("__TVREMOTE_STATUS__:0")
+                } catch (error: Exception) {
+                    disconnect()
+                    false
+                }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) { return false }
+        return try {
+            task.get(15, TimeUnit.SECONDS)
+        } catch (_: Exception) {
+            task.cancel(true)
+            false
+        }
     }
 
     companion object {
         private const val TAG = "AdbHelper"
-
-        @Volatile
-        private var instance: AdbHelper? = null
-
+        @Volatile private var instance: AdbHelper? = null
         fun getInstance(): AdbHelper? = instance
-
-        fun createInstance() {
-            if (instance == null) {
-                synchronized(AdbHelper::class.java) {
-                    if (instance == null) instance = AdbHelper()
-                }
-            }
-        }
-
+        @Synchronized fun createInstance() { if (instance == null) instance = AdbHelper() }
         fun initService(context: Context): Boolean {
-            val inst = instance ?: return false
-            if (!inst.isRunning) {
-                inst.init(context, RemoteServer.getLocalIPAddress(context), Env.adbServerPort)
-            }
+            val helper = instance ?: return false
+            helper.init(context, "127.0.0.1", Env.adbServerPort)
             return true
         }
-
-        fun stopService() {
-            instance?.stop()
-        }
+        fun stopService() { instance?.stop() }
     }
 }

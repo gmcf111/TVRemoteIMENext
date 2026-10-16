@@ -6,4 +6,6 @@
     <string name="step2">Step 2: Set TVRemoteIMENext as the default input method</string>
     <string name="activity_main_title">TVRemoteIME Next</string>
     <string name="accessibility_service_description">Once enabled, your phone browser can send touchpad mouse operations (move cursor, click, swipe, scroll) to the TV for remote control.</string>
+    <string name="remote_service_channel">Remote control service</string>
+    <string name="remote_service_running">LAN remote control and casting service is running</string>
 </resources>

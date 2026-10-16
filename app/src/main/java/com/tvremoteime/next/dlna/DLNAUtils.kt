@@ -23,6 +23,9 @@ import org.fourthline.cling.android.AndroidUpnpServiceImpl
 object DLNAUtils {
     private const val TAG = "DLNAUtils"
     private var mMediaRenderer: ZxtMediaRenderer? = null
+    private var boundContext: Context? = null
+    private var connection: ServiceConnection? = null
+    private var upnp: AndroidUpnpService? = null
 
     fun setDLNANameSuffix(context: Context, nameSuffix: String) {
         val sharedPreferences = context.applicationContext.getSharedPreferences("dlna_settings", 0)
@@ -36,35 +39,47 @@ object DLNAUtils {
     }
 
     fun startDLNAService(context: Context) {
+        if (connection != null) {
+            upnp?.let { refreshRenderer(context.applicationContext, it) }
+            return
+        }
         val serviceConnection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                if (connection !== this) return
                 val upnpService = service as? AndroidUpnpService ?: return
+                upnp = upnpService
                 Log.i(TAG, "DLNA: onServiceConnected")
-                val appContext = context.applicationContext
-                var dlnaName = appContext.getString(R.string.app_name)
-                val dlnaNameSuffix = getDLNANameSuffix(appContext)
-                if (!TextUtils.isEmpty(dlnaNameSuffix)) dlnaName += "($dlnaNameSuffix)"
-                if (mMediaRenderer != null) {
-                    mMediaRenderer?.stopAllMediaPlayers()
-                    upnpService.registry.removeAllLocalDevices()
-                    mMediaRenderer = null
-                }
-                mMediaRenderer = ZxtMediaRenderer(1, dlnaName, appContext)
-                upnpService.registry.addDevice(mMediaRenderer!!.device)
-                Env.toastInHandler(appContext, appContext.getString(R.string.app_name) + " DLNA服务已启动")
+                refreshRenderer(context.applicationContext, upnpService)
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
+                upnp = null
                 Log.i(TAG, "DLNA: onServiceDisconnected")
             }
         }
-        context.bindService(
-            Intent(context, AndroidUpnpServiceImpl::class.java),
-            serviceConnection, Context.BIND_AUTO_CREATE
-        )
+        connection = serviceConnection
+        boundContext = context.applicationContext
+        if (!context.applicationContext.bindService(Intent(context, AndroidUpnpServiceImpl::class.java), serviceConnection, Context.BIND_AUTO_CREATE)) {
+            connection = null
+            boundContext = null
+        }
+    }
+
+    private fun refreshRenderer(context: Context, service: AndroidUpnpService) {
+        val suffix = getDLNANameSuffix(context)
+        val name = context.getString(R.string.app_name) + if (suffix.isEmpty()) "" else "($suffix)"
+        mMediaRenderer?.let { it.stopAllMediaPlayers(); service.registry.removeDevice(it.device) }
+        mMediaRenderer = ZxtMediaRenderer(1, name, context)
+        service.registry.addDevice(mMediaRenderer!!.device)
     }
 
     fun stopDLNAService() {
         mMediaRenderer?.stopAllMediaPlayers()
+        mMediaRenderer?.let { upnp?.registry?.removeDevice(it.device) }
+        connection?.let { boundContext?.unbindService(it) }
+        mMediaRenderer = null
+        upnp = null
+        connection = null
+        boundContext = null
     }
 }

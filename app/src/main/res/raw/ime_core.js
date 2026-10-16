@@ -10,6 +10,14 @@ var curPath = "";
 var selectedPaths = [];
 var selectedPathId = 0;
 var fileOperItems = $('.file-oper-items');
+var keySequence = 0;
+
+function escapeHtml(value) {
+	return String(value).replace(/[&<>"']/g, function (c) {
+		return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+	});
+}
+function jsArg(value) { return escapeHtml(JSON.stringify(String(value))); }
 
 function formatSize(size) {
 	if (size < 1024) {
@@ -22,58 +30,27 @@ function formatSize(size) {
 		return (size / (1024 * 1024 * 1024)).toFixed(1) + " GB";
 	}
 }
-function parseTVData(text) {
-	var tv = [];
-	var lines = text.split('\n');
-	var offset = 0;
-	while (offset < lines.length) {
-		var line = lines[offset].trim();
-		if (line.length > 2 && line.substr(0, 1) == "[" && line.substr(line.length - 1, 1) == "]") {
-			var name = line.substring(1, line.length - 1);
-			var urls = [];
-			offset++;
-			while (offset < lines.length) {
-				line = lines[offset].trim();
-				if (line.length > 1) {
-					var c = line.substr(0, 1);
-					if (c == '[') break;
-					if (c != '#') {
-						var p = line.indexOf('=');
-						if (p > 0) {
-							var item = {
-								"name": line.substring(0, p).trim(),
-								"url": line.substring(p + 1).trim()
-							};
-							if (item.name.length && item.url.length) urls.push(item);
-						}
-					}
-				}
-				offset++;
-			}
-			if (urls.length) tv.push({ "name": name, "urls": urls });
-		} else {
-			offset++;
-		}
-	}
-	return tv;
-}
 function postKeyCode(keyCode) {
 	$.post("/key", { code: keyCode }, function (data) {
 		console.log(data);
 	});
 }
 function postKeyActionCode(keyCode, keyAction) {
+	var sequence = ++keySequence;
+	if (keyActionTimer) { clearTimeout(keyActionTimer); keyActionTimer = null; }
 	curKeyCode = keyCode;
 	curKeyState = keyAction;
 	var action = function () {
 		var path = keyAction == 1 ? "/keydown" : "/keyup";
 		$.post(path, { code: keyCode }, function (data) {
 			console.log(data);
-			if (curKeyState == 1 && curKeyCode == keyCode) {
+			if (sequence === keySequence && curKeyState == 1 && curKeyCode == keyCode) {
 				keyActionTimer = setTimeout(action, 100);
 			} else {
 				keyActionTimer = null;
 			}
+		}).fail(function () {
+			if (sequence === keySequence) { curKeyState = 0; keyActionTimer = null; }
 		});
 	}
 	if (keyAction == 2) {
@@ -102,7 +79,7 @@ function postFileAction(action) {
 			"是否确认要删除所有选择的目录或者文件？不可恢复！";
 	if (confirm(title)) {
 		if (action == "delete" && !confirm("请再次确认是否要删除所有选择的目录或者文件？不可恢复！")) return;
-		$.post("/file/" + action, { targetPath: curPath, paths: selectedPaths.join('|') }, function (data) {
+		$.post("/file/" + action, { targetPath: curPath, paths: selectedPaths.join('|'), pathsJson: JSON.stringify(selectedPaths) }, function (data) {
 			if ("ok" == data) {
 				selectedPaths = [];
 				fileOperItems.empty();
@@ -112,7 +89,7 @@ function postFileAction(action) {
 					loadFileList(curPath);
 				}, 1000);
 			}
-		});
+		}).fail(function (xhr) { alert(xhr.responseText || '文件操作失败'); });
 	}
 }
 function getDiskSpace() {
@@ -130,7 +107,7 @@ function reloadAppList() {
 			var app = data[i];
 			html.push('<div class="app-item">');
 			html.push('<img src="/icon/' + app.packageName + '" class="app-icon" />');
-			html.push('<div class="app-name' + (app.isSysApp ? " blue" : "") + '" id="app-' + i + '" data-packageName="' + app.packageName + '">' + app.lable + "</div>");
+			html.push('<div class="app-name' + (app.isSysApp ? " blue" : "") + '" id="app-' + i + '" data-packageName="' + escapeHtml(app.packageName) + '">' + escapeHtml(app.lable) + "</div>");
 			html.push('<div class="app-btn">');
 			if (app.isSysApp) {
 				html.push('   <input type="button" value="运行" class="btn" onclick="clickApp(' + i + ', 1);" />');
@@ -157,17 +134,17 @@ function loadFileList(path) {
 		var fileDeleteChecked = $("#cbFileSelect")[0].checked;
 		if (data.parent != undefined) {
 			html.push('<div class="file-item"><div class="file-icon-panel">');
-			html.push('<img src="/ic_dl_folder.png" class="file-icon" onclick="loadFileList(\'' + data.parent + '\');" />');
+			html.push('<img src="/ic_dl_folder.png" class="file-icon" onclick="loadFileList(' + jsArg(data.parent) + ');" />');
 			html.push('</div><div class="file-name">..</div>');
 			html.push('</div>');
 		}
 		for (var i = 0; i < data.dirs.length; i++) {
 			var file = data.dirs[i];
 			html.push('<div class="file-item"><div class="file-icon-panel">');
-			html.push('<img src="/ic_dl_folder.png" class="file-icon" onclick="loadFileList(\'' + file.path + '\');" />');
-			html.push('</div><div class="file-name">' + file.name + '</div>');
+			html.push('<img src="/ic_dl_folder.png" class="file-icon" onclick="loadFileList(' + jsArg(file.path) + ');" />');
+			html.push('</div><div class="file-name">' + escapeHtml(file.name) + '</div>');
 			html.push('<div class="app-btn">');
-			html.push('<input type="button" value="选择" class="fbtn2 app-btn1' + (fileDeleteChecked ? '' : ' hide') + '" onclick="addFile(1,\'' + file.name + '\',\'' + file.path + '\');" />');
+			html.push('<input type="button" value="选择" class="fbtn2 app-btn1' + (fileDeleteChecked ? '' : ' hide') + '" onclick="addFile(1,' + jsArg(file.name) + ',' + jsArg(file.path) + ');" />');
 			html.push("</div>");
 			html.push('</div>');
 		}
@@ -175,17 +152,17 @@ function loadFileList(path) {
 			var file = data.files[i];
 			html.push('<div class="file-item"><div class="file-icon-panel">');
 			if (file.isMedia) {
-				html.push('<img src="/ic_dl_video.png" class="file-icon" onclick="playMedia(this)" uri="' + file.fullPath + '" />');
+				html.push('<img src="/ic_dl_video.png" class="file-icon" onclick="playMedia(this)" uri="' + escapeHtml(file.fullPath) + '" />');
 			} else {
 				html.push('<img src="/ic_dl_other.png" class="file-icon" />');
 			}
 			html.push('<div class="' + (file.isMedia ? 'media-size' : 'file-size') + '">' + formatSize(file.size) + '</div>');
-			html.push('</div><div class="file-name">' + file.name + '</div>');
+			html.push('</div><div class="file-name">' + escapeHtml(file.name) + '</div>');
 			html.push('<div class="app-btn">');
-			html.push('<a href="/file/download/' + file.path + '" target="_blank" class="' + (fileDeleteChecked ? ' hide' : '') + '">');
+			html.push('<a href="/file/download/' + encodeURIComponent(file.path) + '" target="_blank" class="' + (fileDeleteChecked ? ' hide' : '') + '">');
 			html.push('<input type="button" value="下载" class="fbtn1 app-btn1" />');
 			html.push("</a>");
-			html.push('\t  <input type="button" value="选择" class="fbtn2 app-btn1' + (fileDeleteChecked ? '' : ' hide') + '" onclick="addFile(2,\'' + file.name + '\',\'' + file.path + '\');" />');
+			html.push('\t  <input type="button" value="选择" class="fbtn2 app-btn1' + (fileDeleteChecked ? '' : ' hide') + '" onclick="addFile(2,' + jsArg(file.name) + ',' + jsArg(file.path) + ');" />');
 			html.push("</div>");
 			html.push('</div>');
 		}
@@ -202,11 +179,11 @@ function addFile(type, name, path) {
 	selectedPaths.push(path);
 	selectedPathId++;
 	var html = [];
-	html.push('<div class="file-oper-item" onclick="removeFile(' + selectedPathId + ',\'' + path + '\');" id="fileOperItem' + selectedPathId + '">');
+	html.push('<div class="file-oper-item" onclick="removeFile(' + selectedPathId + ',' + jsArg(path) + ');" id="fileOperItem' + selectedPathId + '">');
 	html.push('<div class="file-oper-name">');
 	html.push(type == 1 ? "目录" : "文件");
 	html.push("：");
-	html.push(name);
+	html.push(escapeHtml(name));
 	html.push('</div><div class="file-oper-del"><svg class="md-ic" viewBox="0 -960 960 960"><path d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z"/></svg></div></div>');
 	fileOperItems.append(html.join(''));
 	$('.file-operations').removeClass('hidden');
@@ -228,26 +205,6 @@ function removeFile(id, path) {
 		$('.file-operations').addClass('hidden');
 	}
 }
-function loadTVList() {
-	$.get("/tv.txt", null, function (text) {
-		var tvItems = $(".tv-items");
-		tvItems.empty();
-		$('#tvData').val(text);
-		var data = parseTVData(text);
-		var html = [];
-		for (var i = 0; i < data.length; i++) {
-			var tv = data[i];
-			html.push('<div class="tv-item">');
-			html.push(tv.name);
-			html.push('<br />');
-			for (var j = 0; j < tv.urls.length; j++) {
-				html.push('<a class="tv-source" data-video="' + tv.urls[j].url + '" onclick="playTV(this)">' + tv.urls[j].name + '</a>');
-			}
-			html.push('</div>');
-		}
-		tvItems.html(html.join("\r\n"));
-	}, "text");
-}
 $("#confirm").on("click", function () {
 	var $input = $("#inputarea");
 	var text = $input.val();
@@ -268,32 +225,6 @@ $("#cbUninstall").on("click", function () {
 		$(".btn2").addClass("hide");
 	}
 })
-// 直播源编辑（bug 修复：.tv-list/.tv-edit → .tv-section/.tv-editor）
-$('#btnShowTVEdit,#btnTVEdit,#btnTVCancel').on('click', function () {
-	switch (this.id) {
-		case 'btnShowTVEdit':
-			$(".tv-section").addClass("hidden");
-			$(".tv-editor").removeClass("hidden");
-			break;
-		case 'btnTVCancel':
-			$(".tv-editor").addClass("hidden");
-			$(".tv-section").removeClass("hidden");
-			break;
-		case 'btnTVEdit':
-			$.post("/tv.txt", { text: $('#tvData').val() }, function (data) {
-				console.log(data);
-				if (data == "ok") {
-					alert('电视直播源已修改成功！');
-					loadTVList();
-				} else {
-					alert('电视直播源修改失败！');
-				}
-				$(".tv-editor").addClass("hidden");
-				$(".tv-section").removeClass("hidden");
-			});
-			break;
-	}
-});
 $("#cbFileSelect").on("click", function () {
 	if (this.checked) {
 		$(".fbtn1").addClass("hide");
@@ -322,11 +253,17 @@ $(".direction-btn, .direction, #btnDel").on(isSupportTouch ? "touchstart" : "mou
 	postKeyActionCode(o.attr("data-key"), 1);
 	console.log("onkeydown:" + o.attr("data-key"));
 })
-$(".direction-btn, .direction, #btnDel").on(isSupportTouch ? "touchend" : "mouseup", function () {
+$(".direction-btn, .direction, #btnDel").on(isSupportTouch ? "touchend touchcancel" : "mouseup mouseleave", function () {
 	var o = $(this);
 	postKeyActionCode(o.attr("data-key"), 2);
 	console.log("onkeyup:" + o.attr("data-key"));
 })
+$(document).on('mouseup touchend touchcancel', function () {
+	if (curKeyState === 1) postKeyActionCode(curKeyCode, 2);
+});
+$(window).on('blur pagehide', function () {
+	if (curKeyState === 1) postKeyActionCode(curKeyCode, 2);
+});
 // 控制按钮（返回、菜单、主页、音量等）- 单次按键
 $(".control-btn").on("click", function () {
 	var o = $(this);
@@ -346,17 +283,15 @@ $("#btnPlay").on("click", function () {
 	var url = $('#playUrl').val();
 	if (url.length > 0 && (url.indexOf('http://') == 0
 		|| url.indexOf('https://') == 0
-		|| url.indexOf('thunder://') == 0
-		|| url.indexOf('ed2k://') == 0
-		|| url.indexOf('ftp://') == 0
 		|| url.indexOf('rtmp://') == 0
 		|| url.indexOf('rtmps://') == 0
+		|| url.indexOf('rtsp://') == 0
 		|| url.indexOf('mms://') == 0)) {
 		$.post("/play", { playUrl: url, "useSystem": $('#playUseSystem')[0].checked }, function (data) {
 			console.log(data)
 		})
 	} else {
-		alert('请输入正确的网络视频地址，只支持http/ftp/thunder/ed2k/rtmp/mms。');
+		alert('请输入正确的网络视频地址，支持http/https/rtmp/rtsp/mms。');
 	}
 })
 function playMedia(obj) {
@@ -370,9 +305,6 @@ $('#stopPlay').on("click", function () {
 	})
 });
 $('#playUseSystem').on("click", function () {
-	if (this.checked) {
-		alert('调用外部播放器不会自动结束边下边播任务，结束播放后请手动点击停止！');
-	}
 	var time = new Date(9998, 1, 1);
 	if (!this.checked) time = new Date(1900, 1, 1);
 	document.cookie = "playUseSystem=" + (this.checked ? "1" : "0") + "; expires=" + time.toGMTString();
@@ -386,11 +318,6 @@ $('#speedInterval').on("change", function () {
 		console.log(data)
 	})
 });
-function playTV(o) {
-	$.post("/play", { playUrl: $(o).attr('data-video'), "useSystem": $('#playUseSystem')[0].checked }, function (data) {
-		console.log(data)
-	})
-}
 $("#btnClear").on("click", function () {
 	if (confirm("是否要删除所有传送的文件？")) {
 		$.post("/clearCache", null, function (data) {
@@ -409,7 +336,7 @@ function setProgress(processbar, percentText) {
 }
 
 // 修复：app tab 独立 ID（原版重复 id="upfile"/processbar1 导致应用 Tab 上传失效）；$(id).val 笔误
-$("#upfile,#upfile2,#upfile3,#upfileApp,#upfileTV").change(function () {
+$("#upfile,#upfile2,#upfileApp").change(function () {
 	var id = this.id;
 	var formData = new FormData;
 	var file = this.files[0];
@@ -425,11 +352,8 @@ $("#upfile,#upfile2,#upfile3,#upfileApp,#upfileTV").change(function () {
 		formData.append("useSystem", $('#playUseSystem')[0].checked);
 		processbar = (id == "upfile") ? processbar1 : processbarApp;
 	}
-	formData.append("file", file, encodeURI(file.uploadName || file.name));
-	// upfileTV：上传直播源文件 → POST /tv.txt（multipart，服务端整体覆盖 tv.txt）
-	var url = (id == "upfile2") ? "/file/upload"
-		: ((id == "upfile3") ? "/torrent/upload"
-			: (id == "upfileTV" ? "/tv.txt" : "/upload"));
+	formData.append("file", file, encodeURIComponent(file.uploadName || file.name));
+	var url = (id == "upfile2") ? "/file/upload" : "/upload";
 	$.ajax({
 		type: "POST",
 		url: url,
@@ -460,12 +384,6 @@ $("#upfile,#upfile2,#upfile3,#upfileApp,#upfileTV").change(function () {
 				if (id == "upfile2") {
 					loadFileList(curPath);
 					alert("文件已成功上传到当前目录。");
-				} else if (id == "upfile3") {
-					alert("种子文件已上传并解析，请选择要播放的视频文件。");
-					addTorrentItems(data);
-				} else if (id == "upfileTV") {
-					loadTVList();
-					alert("直播源文件已上传并生效。");
 				} else {
 					if ($('#cbAutoInstall')[0].checked && file.name.indexOf(".apk") != -1) {
 						alert("APK包已传送到TV盒子并执行安装，请留意TV屏幕的安装请求。");
@@ -479,31 +397,6 @@ $("#upfile,#upfile2,#upfile3,#upfileApp,#upfileTV").change(function () {
 		}
 	});
 });
-$('#btnPlayTorrent').on('click', function () {
-	var torrentItems = $("#torrentItems");
-	var videoIndex = torrentItems.val();
-	if (videoIndex != '') {
-		$.post('/torrent/play', { "videoIndex": videoIndex, "useSystem": $('#playUseSystem')[0].checked }, function (data) {
-			console.log(data);
-		});
-	}
-});
-function addTorrentItems(data) {
-	var torrentItems = $("#torrentItems");
-	torrentItems.empty();
-	if (data.files && data.files.length) {
-		for (var i = 0; i < data.files.length; i++) {
-			var f = data.files[i];
-			torrentItems.append("<option value='" + f.index + "'>" + f.name + "(" + formatSize(f.size) + ")</option>");
-		}
-		torrentItems.val(data.files[0].index);
-	}
-}
-function loadTorrentItems() {
-	$.post('/torrent/data', null, function (data) {
-		if (data.success) addTorrentItems(data);
-	});
-}
 
 function upgrade() {
 	$.get('/version', function (version) {
@@ -522,7 +415,7 @@ function renderChannelBadges(info) {
 	var html = [];
 	html.push('<span class="badge-title">通道：</span>');
 	['root', 'ime', 'a11y', 'adb'].forEach(function (id) {
-		var ch = info[id] || {};
+		var ch = info[id === 'a11y' ? 'accessibility' : id] || {};
 		var on = ch.available === true;
 		html.push('<span class="channel-badge ' + (on ? 'on' : 'off') + '">' + (names[id] || id) + '</span>');
 	});
@@ -680,9 +573,9 @@ function currentMode() {
 	return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
 
-function setMode(mode) {
+function setMode(mode, followSystem) {
 	document.documentElement.setAttribute('data-theme', mode);
-	localStorage.setItem('next_mode', mode);
+	if (!followSystem) localStorage.setItem('next_mode', mode);
 	var meta = document.querySelector('meta[name="theme-color"]');
 	if (meta) meta.setAttribute('content', mode === 'dark' ? '#121316' : '#FDFCFF');
 }
@@ -695,7 +588,7 @@ function setupModeToggle() {
 	if (window.matchMedia) {
 		var mq = matchMedia('(prefers-color-scheme: dark)');
 		var onChange = function () {
-			if (!localStorage.getItem('next_mode')) setMode(mq.matches ? 'dark' : 'light');
+			if (!localStorage.getItem('next_mode')) setMode(mq.matches ? 'dark' : 'light', true);
 		};
 		if (mq.addEventListener) mq.addEventListener('change', onChange);
 		else if (mq.addListener) mq.addListener(onChange);
@@ -706,7 +599,7 @@ function setupModeToggle() {
 
 function initRipple() {
 	var selector = '.btn-primary,.btn-secondary,.btn-danger,.btn-warning,.file-btn,.tab,' +
-		'.dpad-btn,.dpad-action-btn,.mouse-btn,.swipe-btn,.tv-source,.btn,.btn1,.btn2,.fbtn1,.fbtn2';
+		'.dpad-btn,.dpad-action-btn,.mouse-btn,.swipe-btn,.btn,.btn1,.btn2,.fbtn1,.fbtn2';
 	$(document).on(isSupportTouch ? 'touchstart' : 'mousedown', selector, function (e) {
 		var el = $(this);
 		if (!this.getBoundingClientRect) return;
@@ -734,33 +627,31 @@ function initRipple() {
 
 var LANG = {
 	zh: {
-		'输入遥控': '输入遥控', '触摸板': '触摸板', '应用管理': '应用管理', '文件管理': '文件管理', '视频直播': '视频直播',
+		'输入遥控': '输入遥控', '触摸板': '触摸板', '应用管理': '应用管理', '文件管理': '文件管理', '视频播放': '视频播放',
 		'输入': '输入', '退格': '退格', '清空': '清空', '清除缓存': '清除缓存',
 		'截屏': '截屏', '每2秒刷新': '每2秒刷新', '应用': '应用', '默认': '默认',
-		'停止边下边播': '停止边下边播', '远程播放': '远程播放', '开始播放': '开始播放',
+		'停止播放': '停止播放', '远程播放': '远程播放',
 		'修改': '修改', '取消': '取消', '复制': '复制', '剪切': '剪切', '删除': '删除',
 		'传送后自动安装APK或播放视频': '传送后自动安装APK或播放视频',
 		'显示系统应用': '显示系统应用', '卸载应用': '卸载应用', '选择': '选择',
-		'调用系统播放器': '调用系统播放器', '系统设置': '系统设置', '上传直播源': '上传直播源',
-		'电视节目：': '电视节目：', '需要更改直播源？': '需要更改直播源？', '点击这里': '点击这里'
+		'调用系统播放器': '调用系统播放器', '系统设置': '系统设置'
 	},
 	en: {
-		'输入遥控': 'Remote', '触摸板': 'Touchpad', '应用管理': 'Apps', '文件管理': 'Files', '视频直播': 'Video',
+		'输入遥控': 'Remote', '触摸板': 'Touchpad', '应用管理': 'Apps', '文件管理': 'Files', '视频播放': 'Video',
 		'输入': 'Send', '退格': 'Backspace', '清空': 'Clear', '清除缓存': 'Clear Cache',
 		'截屏': 'Screenshot', '每2秒刷新': 'Refresh 2s', '应用': 'Apply', '默认': 'Default',
-		'停止边下边播': 'Stop P2P', '远程播放': 'Play', '开始播放': 'Play',
+		'停止播放': 'Stop', '远程播放': 'Play',
 		'修改': 'Save', '取消': 'Cancel', '复制': 'Copy', '剪切': 'Cut', '删除': 'Delete',
 		'传送后自动安装APK或播放视频': 'Auto-install APK / play video after upload',
 		'显示系统应用': 'Show system apps', '卸载应用': 'Uninstall mode', '选择': 'Select',
-		'调用系统播放器': 'Use system player', '系统设置': 'System settings', '上传直播源': 'Upload sources',
-		'电视节目：': 'TV channels:', '需要更改直播源？': 'Change channel source?', '点击这里': 'click here'
+		'调用系统播放器': 'Use system player', '系统设置': 'System settings'
 	}
 };
 var currentLang = localStorage.getItem('next_lang');
 if (!currentLang) currentLang = (navigator.language || 'zh').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
 
 var I18N_SELECTOR = '.tab-text,#confirm,#btnDel,#btnCls,#btnClear,#btnScreenshot,#showSettings>span,' +
-	'.file-btn>span,#stopPlay,#btnPlay,#btnPlayTorrent,#btnTVEdit,#btnTVCancel,#btnCopy,#btnCut,#btnDelete,.checkbox-label>span';
+	'.file-btn>span,#stopPlay,#btnPlay,#btnCopy,#btnCut,#btnDelete,.checkbox-label>span';
 
 function applyLang() {
 	var dict = LANG[currentLang] || LANG.zh;
@@ -785,8 +676,6 @@ function setupLang() {
 reloadAppList();
 loadFileList("");
 getDiskSpace();
-loadTVList();
-loadTorrentItems();
 upgrade();
 setupScreenshot();
 syncThemeFromBox();
@@ -957,7 +846,7 @@ function onTouchpadEnd(e) {
 	var tapDuration = Date.now() - touchpad.tapStartTime;
 
 	// 快速点击且没有明显移动 = 点击
-	if (tapDuration < 300 && !touchpad.hasMoved) {
+	if (e.type !== 'touchcancel' && e.type !== 'mouseleave' && tapDuration < 300 && !touchpad.hasMoved) {
 		if (touchpad.fingers >= 2) {
 			mouseClick(1);  // 双指 = 右键
 		} else {
@@ -973,9 +862,8 @@ function onTouchpadEnd(e) {
 function mouseMove(dx, dy) {
 	if (dx === 0 && dy === 0) return;
 	$.post("/mouse/move", { dx: dx, dy: dy }, function (data) {
-		if (data && String(data).indexOf('ok:') === 0) {
-			var pos = String(data).substring(3).split(',');
-			$('#mouse-pos').text('位置: ' + pos[0] + ', ' + pos[1]);
+		if (data && data.status === 'ok') {
+			$('#mouse-pos').text('位置: ' + data.x + ', ' + data.y);
 		}
 	});
 }
@@ -984,15 +872,15 @@ function mouseMove(dx, dy) {
 function mouseClick(button) {
 	$.post("/mouse/click", { button: button }, function (data) {
 		console.log('click:', data);
-		if (data === 'ok') {
+		if (data && data.status === 'ok') {
 			// 视觉反馈
 			var btnId = button === 0 ? '#mouse-left' : (button === 1 ? '#mouse-right' : '#mouse-middle');
 			$(btnId).css('transform', 'scale(0.95)');
 			setTimeout(function () {
 				$(btnId).css('transform', '');
 			}, 100);
-		} else if (data && String(data).indexOf('error:') === 0) {
-			$('#adb-status').text('ADB: 未连接').removeClass('connected').addClass('disconnected');
+		} else if (data && data.status === 'error') {
+			$('#adb-status').text(data.message).removeClass('connected').addClass('disconnected');
 		}
 	});
 }
@@ -1046,11 +934,11 @@ function mouseLongClick() {
 
 // 检查 ADB 状态
 function checkAdbStatus() {
-	$.post("/mouse/move", { dx: 0, dy: 0 }, function (data) {
-		if (data && String(data).indexOf('ok:') === 0) {
-			$('#adb-status').text('ADB: 已连接').removeClass('disconnected').addClass('connected');
+	$.get("/mouse/status", function (data) {
+		if (data && data.controlAvailable) {
+			$('#adb-status').text('触控: ' + data.activeChannel).removeClass('disconnected').addClass('connected');
 		} else {
-			$('#adb-status').text('ADB: 未连接').removeClass('connected').addClass('disconnected');
+			$('#adb-status').text('触控: 无可用通道').removeClass('connected').addClass('disconnected');
 		}
 	}).fail(function () {
 		$('#adb-status').text('ADB: 未连接').removeClass('connected').addClass('disconnected');
@@ -1062,5 +950,5 @@ $(document).ready(function () {
 	initTouchpad();
 	// 定期检查 ADB 状态
 	checkAdbStatus();
-	setInterval(checkAdbStatus, 10000);
+	setInterval(function () { checkAdbStatus(); refreshChannelInfo(); syncThemeFromBox(); }, 10000);
 });

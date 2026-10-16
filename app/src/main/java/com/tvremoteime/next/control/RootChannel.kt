@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.concurrent.Executors
 
 /**
  * Root 通道（02 文档 2.3，阶段 4）
@@ -23,15 +22,20 @@ class RootChannel(private val context: Context) : ControlChannel {
         Capability.SET_DEFAULT_IME
     )
 
-    private val executor = Executors.newCachedThreadPool { r -> Thread(r, "root-channel") }
-
     /** su 探测缓存：null=未探测，true/false=结果 */
     @Volatile
     private var suAvailable: Boolean? = null
+    @Volatile
+    private var suExecutable: String = "su"
 
     override fun isAvailable(): Boolean {
+        return RootPrefs.isEnabled(context) && suAvailable == true
+    }
+
+    /** 仅由用户主动开启 Root 开关触发，不在状态查询/进程重启时弹授权框。 */
+    @Synchronized
+    fun probe(): Boolean {
         if (!RootPrefs.isEnabled(context)) return false
-        suAvailable?.let { return it }
         val result = detectSu()
         suAvailable = result
         return result
@@ -44,23 +48,20 @@ class RootChannel(private val context: Context) : ControlChannel {
 
     /** 多路径 su 探测（探测结果缓存于 suAvailable） */
     private fun detectSu(): Boolean {
-        val suPaths = listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/su/bin/su", "/magisk/.core/bin/su")
-        var found = false
+        val suPaths = listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/su/bin/su", "/magisk/.core/bin/su", "su")
         for (p in suPaths) {
-            if (File(p).exists()) {
-                found = true
-                break
+            if (p == "su" || File(p).canExecute()) {
+                suExecutable = p
+                if (runSuCommand("id", timeoutSec = 10)?.contains("uid=0") == true) return true
             }
         }
-        if (!found) return false
-        // 实际验证 su 可用（Magisk 拒绝授权时 which 有但命令失败）
-        return runSuCommand("id", timeoutSec = 5)?.let { it.contains("uid=0") } == true
+        return false
     }
 
     /** 兼容 API 19 的带超时等待（Process.waitFor(timeout) 需 API 26） */
     private fun waitWithTimeout(process: Process, timeoutSec: Long): Boolean {
-        val deadline = System.currentTimeMillis() + timeoutSec * 1000
-        while (System.currentTimeMillis() < deadline) {
+        val deadline = System.nanoTime() + timeoutSec * 1_000_000_000L
+        while (System.nanoTime() < deadline) {
             try {
                 process.exitValue()
                 return true
@@ -78,65 +79,43 @@ class RootChannel(private val context: Context) : ControlChannel {
     }
 
     /** 执行 su -c 命令，返回 stdout（合并 stderr 排查用），超时/失败返回 null */
-    fun runSuCommand(command: String, timeoutSec: Long = 10): String? {
-        return try {
-            val process = ProcessBuilder("su", "-c", command).start()
-            val out = ByteArrayOutputStream()
-            val err = ByteArrayOutputStream()
-            val tOut = Thread { process.inputStream.copyTo(out) }
-            val tErr = Thread { process.errorStream.copyTo(err) }
-            tOut.start(); tErr.start()
-            if (!waitWithTimeout(process, timeoutSec)) {
-                Log.e(TAG, "su command timeout: $command")
-                return null
-            }
-            tOut.join(1000); tErr.join(1000)
-            if (process.exitValue() == 0) out.toString("UTF-8") else {
-                Log.e(TAG, "su command failed ($command): ${err.toString("UTF-8").trim()}")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "su command error: $command", e)
-            null
-        }
-    }
+    fun runSuCommand(command: String, timeoutSec: Long = 10): String? =
+        runSuBytes(command, timeoutSec)?.toString(Charsets.UTF_8)
 
     /** 执行 su -c 命令并取原始字节（screencap 用） */
     fun runSuBytes(command: String, timeoutSec: Long = 15): ByteArray? {
+        var process: Process? = null
         return try {
-            val process = ProcessBuilder("su", "-c", command).start()
+            val child = ProcessBuilder(suExecutable, "-c", command).start()
+            process = child
+            child.outputStream.close()
             val out = ByteArrayOutputStream()
             val err = ByteArrayOutputStream()
-            val tOut = Thread { process.inputStream.copyTo(out) }
-            val tErr = Thread { process.errorStream.copyTo(err) }
+            val tOut = Thread { try { child.inputStream.use { it.copyTo(out) } } catch (_: java.io.IOException) { } }.apply { isDaemon = true }
+            val tErr = Thread { try { child.errorStream.use { it.copyTo(err) } } catch (_: java.io.IOException) { } }.apply { isDaemon = true }
             tOut.start(); tErr.start()
-            if (!waitWithTimeout(process, timeoutSec)) {
+            if (!waitWithTimeout(child, timeoutSec)) {
                 return null
             }
             tOut.join(1000); tErr.join(1000)
-            if (process.exitValue() == 0) out.toByteArray() else null
+            if (child.exitValue() == 0 && !tOut.isAlive && !tErr.isAlive) out.toByteArray() else null
         } catch (e: Exception) {
             Log.e(TAG, "su bytes error: $command", e)
             null
+        } finally {
+            process?.destroy()
+            try { process?.inputStream?.close() } catch (_: java.io.IOException) { }
+            try { process?.errorStream?.close() } catch (_: java.io.IOException) { }
         }
     }
 
     // ============ 按键/文字 ============
 
     fun sendKey(keyCode: Int): Boolean =
-        runSuCommand("input keyevent $keyCode", 5) != null || runShellKey(keyCode)
+        runSuCommand("input keyevent $keyCode", 5) != null
 
     fun sendText(text: String): Boolean {
-        val escaped = text.replace(" ", "%s").replace("\"", "\\\"").replace("\\", "\\\\")
-        return runSuCommand("input text \"$escaped\"", 8) != null
-    }
-
-    /** su 不可用但系统允许 input 的少数场景兜底 */
-    private fun runShellKey(keyCode: Int): Boolean = try {
-        Runtime.getRuntime().exec(arrayOf("sh", "-c", "input keyevent $keyCode"))
-        true
-    } catch (e: Exception) {
-        false
+        return runSuCommand(ShellCommands.text(text), 8) != null
     }
 
     // ============ 触控补位 ============
@@ -157,37 +136,7 @@ class RootChannel(private val context: Context) : ControlChannel {
      */
     fun screenshot(): ByteArray? {
         val data = runSuBytes("screencap -p", 20) ?: return null
-        return fixCrlf(data)
-    }
-
-    /** 4.x CRLF 修复：PNG 内不应出现 \r\n，全部还原为 \n */
-    private fun fixCrlf(data: ByteArray): ByteArray {
-        // PNG 魔数快速判定
-        if (data.size < 8 || data[0] != (-119).toByte() || data[1] != 0x50.toByte()) return data
-        var dirty = false
-        var i = 0
-        while (i < data.size - 1) {
-            if (data[i] == '\r'.code.toByte() && data[i + 1] == '\n'.code.toByte()) {
-                dirty = true
-                break
-            }
-            i++
-        }
-        if (!dirty) return data
-        val out = ByteArrayOutputStream(data.size)
-        var j = 0
-        while (j < data.size) {
-            val b = data[j]
-            if (b == '\r'.code.toByte() && j + 1 < data.size && data[j + 1] == '\n'.code.toByte()) {
-                out.write('\n'.code)
-                j += 2
-            } else {
-                out.write(b.toInt())
-                j++
-            }
-        }
-        Log.i(TAG, "screenshot CRLF fixed: ${data.size} -> ${out.size()}")
-        return out.toByteArray()
+        return PngScreenshot.normalize(data)
     }
 
     // ============ 静默安装/卸载（独占能力） ============
@@ -195,14 +144,14 @@ class RootChannel(private val context: Context) : ControlChannel {
     /** root 静默安装；返回 null=成功，非 null=失败原因 */
     fun silentInstall(apkPath: String): String? {
         val result = runSuCommand(
-            "pm install -r \"$apkPath\"", 60
+            "pm install -r ${ShellCommands.quote(apkPath)}", 60
         )
-        return if (result != null) null else "pm install 执行失败（详见日志）"
+        return if (result?.trim() == "Success") null else "pm install 执行失败（详见日志）"
     }
 
     fun silentUninstall(packageName: String): String? {
-        val result = runSuCommand("pm uninstall $packageName", 30)
-        return if (result != null) null else "pm uninstall 执行失败（详见日志）"
+        val result = runSuCommand("pm uninstall ${ShellCommands.quote(packageName)}", 30)
+        return if (result?.trim() == "Success") null else "pm uninstall 执行失败（详见日志）"
     }
 
     // ============ 系统域（独占能力） ============
@@ -210,7 +159,7 @@ class RootChannel(private val context: Context) : ControlChannel {
     /** 设置本应用为系统默认输入法（替代旧版"请手动设置"的引导流程） */
     fun setDefaultIme(): Boolean {
         val imeId = "${context.packageName}/com.tvremoteime.next.IME.IMEService"
-        return runSuCommand("ime set $imeId", 10) != null
+        return runSuCommand("ime enable ${ShellCommands.quote(imeId)} && ime set ${ShellCommands.quote(imeId)}", 10) != null
     }
 
     /** root 可用时的快速探测结果文案（UI 展示） */

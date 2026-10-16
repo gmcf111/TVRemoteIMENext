@@ -58,7 +58,7 @@ object ThemePrefs {
     fun parseHex(v: String): Int? = try {
         when {
             v.length == 7 && v.startsWith("#") -> Color.parseColor(v)
-            v.length == 4 && v.startsWith("#") -> Color.parseColor(v) // #RGB
+            v.length == 4 && v.startsWith("#") -> Color.parseColor("#" + v.drop(1).flatMap { listOf(it, it) }.joinToString(""))
             else -> null
         }
     } catch (e: Exception) {

@@ -13,13 +13,15 @@ import java.net.URLDecoder
  * 服务器文件管理（对应旧版 RemoteServerFileManager.java）
  *
  * 两个目录语义（与旧版一致，拆分显式化）：
- * - dataDir：应用外部私有目录（getExternalFilesDir）——上传落地、tv.txt、play.torrent、缓存
+ * - dataDir：应用外部私有目录（getExternalFilesDir）——上传落地、缓存
  * - storageRoot：文件浏览/下载的根——全盘授权=外部存储根（旧版体验）；未授权=私有目录降级
+ *
+ * v3.0：移除播放器下载缓存目录（xlplayer）与 play.torrent。
  */
 object ServerFileManager {
     private const val TAG = "ServerFileManager"
 
-    /** 应用私有数据目录（tv.txt、play.torrent、上传文件、缓存） */
+    /** 应用私有数据目录（上传文件、缓存） */
     @Volatile
     var dataDir: File = File(android.os.Environment.getExternalStorageDirectory(), "Android/data/com.tvremoteime.next/files")
         private set
@@ -31,14 +33,12 @@ object ServerFileManager {
 
     private var filesDir = File(dataDir, "files")
     private var tmpDataDir = File(dataDir, "temp")
-    private var playerCacheDir = File(dataDir, "xlplayer")
 
     fun resetBaseDir(context: Context) {
         dataDir = context.getExternalFilesDir(null) ?: context.filesDir
         storageRoot = com.tvremoteime.next.core.StorageHelper.getStorageRoot(context)
         filesDir = File(dataDir, "files")
         tmpDataDir = File(dataDir, "temp")
-        playerCacheDir = File(dataDir, "xlplayer")
         try {
             if (!filesDir.exists()) filesDir.mkdirs()
             if (!tmpDataDir.exists()) tmpDataDir.mkdirs()
@@ -46,7 +46,9 @@ object ServerFileManager {
         }
     }
 
-    fun getPlayTorrentFile(): File = File(dataDir, "play.torrent")
+    fun refreshStorageRoot(context: Context) {
+        storageRoot = com.tvremoteime.next.core.StorageHelper.getStorageRoot(context)
+    }
 
     fun getScreenShotFile(): File = File(dataDir, "screenshot.png")
 
@@ -60,7 +62,10 @@ object ServerFileManager {
                 file = File.createTempFile("tmp-", "", tmpDataDir)
                 isTemp = true
             } else {
-                file = File(filesDir, fileName)
+                // 每个上传拥有独立目录，避免同名并发请求相互截断文件。
+                val uploadDir = File(filesDir, java.util.UUID.randomUUID().toString())
+                if (!uploadDir.mkdirs()) throw IOException("Cannot create upload directory")
+                file = File(uploadDir, fileName)
                 isTemp = false
             }
             try {
@@ -109,9 +114,10 @@ object ServerFileManager {
         override fun createTempFile(fileName: String?): NanoHTTPD.TempFile {
             var name = fileName
             if (!name.isNullOrEmpty()) {
-                name = URLDecoder.decode(name, "utf-8")
-                    .replace(Regex("[\\\\|/]"), "")
+                name = (try { URLDecoder.decode(name.replace("+", "%2B"), "utf-8") } catch (_: IllegalArgumentException) { name })
+                    .replace(Regex("[\\\\/]"), "")
                     .replace("..", "")
+                require(name.isNotBlank() && name != "." && '\u0000' !in name) { "Invalid upload filename" }
             }
             val tmpFile = SDCardTempFile(name)
             tempFiles.add(tmpFile)
@@ -123,9 +129,6 @@ object ServerFileManager {
         try {
             if (filesDir.exists()) deleteDirFiles(filesDir)
             if (tmpDataDir.exists()) deleteDirFiles(tmpDataDir)
-            if (playerCacheDir.exists()) deleteDirFiles(playerCacheDir)
-            val torrentFile = getPlayTorrentFile()
-            if (torrentFile.exists()) torrentFile.delete()
         } catch (ignored: Exception) {
         }
     }

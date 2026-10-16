@@ -20,11 +20,7 @@ class IMEServiceBroadCastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "receive msg:" + intent.action)
         if (Intent.ACTION_BOOT_COMPLETED == intent.action || Intent.ACTION_MEDIA_MOUNTED == intent.action) {
-            if (!Env.isDefaultIME(context)) {
-                Log.d(TAG, "startService.....")
-                context.startService(Intent(IMEService.ACTION))
-                if (AdbHelper.getInstance() == null) AdbHelper.createInstance()
-            }
+            com.tvremoteime.next.server.RemoteControlService.start(context)
         }
     }
 }

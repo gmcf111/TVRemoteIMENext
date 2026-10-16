@@ -20,4 +20,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TVRemoteIMENext"
-include ':app', ':adb-lib', ':ijkplayer', ':thunder', ':DroidDLNA'
+include ':app', ':adb-lib', ':ijkplayer', ':DroidDLNA'

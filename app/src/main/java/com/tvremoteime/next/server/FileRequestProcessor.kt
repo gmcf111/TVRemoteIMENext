@@ -1,13 +1,14 @@
 package com.tvremoteime.next.server
 
 import android.content.Context
+import com.tvremoteime.next.core.FileAccess
+import com.tvremoteime.next.core.MediaTypes
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import org.json.JSONArray
 import org.json.JSONObject
-import xllib.FileUtils
 
 /**
  * 文件管理端点（对应旧版 FileRequestProcesser.java）
@@ -29,32 +30,8 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
         } else false
     }
 
-    /** 防路径穿越：解码 URL、去空字节、正反斜杠统一、拒绝 .. 及回溯模式、去前导斜杠 */
-    private fun sanitizePath(requestedPath: String?): String? {
-        if (requestedPath == null) return null
-        var path = try {
-            java.net.URLDecoder.decode(requestedPath, "UTF-8")
-        } catch (e: Exception) {
-            return null
-        }
-        if (path.contains("\u0000")) return null
-        path = path.replace('\\', '/')
-        if (path.contains("../") || path.contains("/..") || path == "..") return null
-        while (path.startsWith("/")) path = path.substring(1)
-        return path
-    }
-
-    /** 将净化后的相对路径解析到 storageRoot 内的 File，越界返回 null */
-    private fun safeFile(requestedPath: String?): File? {
-        val sanitized = sanitizePath(requestedPath) ?: return null
-        val root = ServerFileManager.storageRoot
-        val file = File(root, sanitized)
-        return try {
-            if (file.canonicalPath.startsWith(root.canonicalPath)) file else null
-        } catch (e: IOException) {
-            null
-        }
-    }
+    private fun safeFile(requestedPath: String?): File? =
+        FileAccess.resolve(ServerFileManager.storageRoot, requestedPath)
 
     override fun doResponse(
         session: NanoHTTPD.IHTTPSession,
@@ -62,6 +39,7 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
         params: Map<String, String>,
         files: Map<String, String>
     ): NanoHTTPD.Response {
+        ServerFileManager.refreshStorageRoot(context)
         if (session.method == NanoHTTPD.Method.GET) {
             return when {
                 fileName.startsWith("/file/dir/") -> responseDirData(fileName.substring("/file/dir/".length))
@@ -69,22 +47,29 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
                 else -> notFound()
             }
         }
-        val paths = params["paths"]
-        return when (fileName) {
-            "/file/copy" -> {
-                if (!paths.isNullOrEmpty()) batchCopyFile(params["targetPath"], paths)
-                ok()
+        if (fileName == "/file/upload") return uploadFile(params, files)
+        return try {
+            // 新客户端用 JSON 数组支持文件名中的 |，保留旧 paths 参数。
+            val paths = params["pathsJson"]?.let { json ->
+                val array = JSONArray(json)
+                List(array.length()) { array.getString(it) }
+            } ?: params["paths"]?.split('|')?.filter { it.isNotEmpty() }.orEmpty()
+            require(paths.isNotEmpty()) { "No files selected" }
+            val sources = paths.map { safeFile(it) ?: throw IOException("Invalid path") }
+            require(sources.none { it == ServerFileManager.storageRoot.canonicalFile }) { "Cannot modify storage root" }
+            when (fileName) {
+                "/file/copy", "/file/cut" -> {
+                    val target = safeFile(params["targetPath"]) ?: throw IOException("Invalid destination")
+                    sources.forEach { FileAccess.copy(it, target, fileName == "/file/cut") }
+                }
+                "/file/delete" -> sources.forEach {
+                    if (!it.exists() || !it.deleteRecursively()) throw IOException("Cannot delete ${it.name}")
+                }
+                else -> return notFound()
             }
-            "/file/cut" -> {
-                if (!paths.isNullOrEmpty()) batchCutFile(params["targetPath"], paths)
-                ok()
-            }
-            "/file/delete" -> {
-                if (!paths.isNullOrEmpty()) batchDeleteFile(paths)
-                ok()
-            }
-            "/file/upload" -> uploadFile(params, files)
-            else -> notFound()
+            ok()
+        } catch (error: Exception) {
+            RemoteServer.createPlainTextResponse(NanoHTTPD.Response.Status.BAD_REQUEST, error.message ?: "File operation failed")
         }
     }
 
@@ -94,7 +79,7 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
     )
 
     private fun responseDirData(dirName: String): NanoHTTPD.Response {
-        val root = ServerFileManager.storageRoot
+        val root = ServerFileManager.storageRoot.canonicalFile
         val path = safeFile(dirName) ?: return notFound()
         val dirs = JSONArray()
         val files = JSONArray()
@@ -104,19 +89,19 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
                 if (file.isHidden) continue
                 val item = JSONObject()
                 item.put("name", file.name)
-                item.put("path", file.path.substring(root.path.length))
+                item.put("path", "/" + file.relativeTo(root).invariantSeparatorsPath)
                 item.put("fullPath", file.path)
                 if (file.isDirectory) {
                     dirs.put(item)
                 } else {
                     item.put("size", file.length())
-                    item.put("isMedia", FileUtils.isMediaFile(file.name))
+                    item.put("isMedia", MediaTypes.isMediaFile(file.name))
                     files.put(item)
                 }
             }
             val data = JSONObject()
-            if (dirName.isNotEmpty() && dirName != "/") {
-                data.put("parent", path.parent?.substring(root.path.length) ?: "")
+            if (path != root) {
+                data.put("parent", path.parentFile?.relativeTo(root)?.invariantSeparatorsPath ?: "")
             }
             data.put("dirs", dirs)
             data.put("files", files)
@@ -131,15 +116,12 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
 
     private fun downloadFileData(fileName: String): NanoHTTPD.Response {
         val file = safeFile(fileName) ?: return notFound()
-        if (!file.exists()) return notFound()
+        if (!file.isFile) return notFound()
         return try {
-            FileInputStream(file).use { input ->
-                NanoHTTPD.newFixedLengthResponse(
-                    NanoHTTPD.Response.Status.OK,
-                    "${NanoHTTPD.getMimeTypeForFile(file.name)}; charset=utf-8",
-                    input, file.length()
-                )
-            }
+            NanoHTTPD.newFixedLengthResponse(
+                NanoHTTPD.Response.Status.OK, NanoHTTPD.getMimeTypeForFile(file.name),
+                FileInputStream(file), file.length()
+            )
         } catch (e: Exception) {
             notFound()
         }
@@ -153,33 +135,14 @@ class FileRequestProcessor(private val context: Context) : RequestProcessor {
         if (!uploadFileName.isNullOrEmpty() && !localFilename.isNullOrEmpty()) {
             val saveDir = safeFile(uploadPathName) ?: return RemoteServer.createJSONResponse(NanoHTTPD.Response.Status.OK, "{\"success\":false}")
             val localFile = File(localFilename)
-            val saveFile = File(saveDir, localFile.name)
-            success = localFile.renameTo(saveFile)
+            try {
+                FileAccess.copy(localFile, saveDir, move = true)
+                success = true
+            } catch (_: Exception) { }
         }
         return RemoteServer.createJSONResponse(
             NanoHTTPD.Response.Status.OK, "{\"success\":${if (success) "true" else "false"}}"
         )
     }
 
-    private fun batchDeleteFile(paths: String) {
-        for (p in paths.split("|")) {
-            if (p.isNotEmpty()) safeFile(p)?.let { ServerFileManager.deleteFile(it) }
-        }
-    }
-
-    private fun batchCopyFile(targetPath: String?, paths: String) {
-        val targetPathFile = safeFile(targetPath) ?: return
-        if (!targetPathFile.exists()) return
-        for (p in paths.split("|")) {
-            if (p.isNotEmpty()) safeFile(p)?.let { ServerFileManager.copyFile(it, targetPathFile) }
-        }
-    }
-
-    private fun batchCutFile(targetPath: String?, paths: String) {
-        val targetPathFile = safeFile(targetPath) ?: return
-        if (!targetPathFile.exists()) return
-        for (p in paths.split("|")) {
-            if (p.isNotEmpty()) safeFile(p)?.let { ServerFileManager.cutFile(it, targetPathFile) }
-        }
-    }
 }

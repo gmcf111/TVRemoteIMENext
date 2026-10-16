@@ -2,9 +2,9 @@ package com.tvremoteime.next.server
 
 import android.content.Context
 import com.tvremoteime.next.core.AppPackagesHelper
+import com.tvremoteime.next.core.MediaTypes
 import com.tvremoteime.next.core.VideoPlayHelper
 import fi.iki.elonen.NanoHTTPD
-import xllib.FileUtils
 import java.io.File
 
 /**
@@ -38,17 +38,16 @@ class UploadRequestProcessor(private val context: Context) : RequestProcessor {
                 } else {
                     AppPackagesHelper.installPackage(File(localFilename), context)
                 }
-            } else if (FileUtils.isMediaFile(localFilename)) {
-                VideoPlayHelper.playUrl(context, localFilename, 0, params["useSystem"] == "true")
+            } else if (MediaTypes.isMediaFile(localFilename)) {
+                VideoPlayHelper.playUrl(context, localFilename, params["useSystem"] == "true")
             }
         }
         return if (localFilename.isNullOrEmpty()) {
             RemoteServer.createJSONResponse(NanoHTTPD.Response.Status.OK, "{\"success\":false}")
         } else {
-            val escapedPath = localFilename.replace("\\", "\\\\")
             RemoteServer.createJSONResponse(
                 NanoHTTPD.Response.Status.OK,
-                "{\"success\":true, \"filePath\":\"$escapedPath\"}"
+                org.json.JSONObject().put("success", true).put("filePath", localFilename).toString()
             )
         }
     }

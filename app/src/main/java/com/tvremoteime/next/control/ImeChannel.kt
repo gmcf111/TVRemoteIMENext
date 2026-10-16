@@ -27,6 +27,11 @@ class ImeChannel(private val context: Context) : ControlChannel {
     fun sendKey(keyCode: Int): Boolean = imeKeyHook?.invoke(keyCode) == true
 
     companion object {
+        @Volatile
+        var imeDispatchHook: ((String, Int) -> Boolean)? = null
+
+        fun dispatchKey(code: String, action: Int): Boolean = imeDispatchHook?.invoke(code, action) == true
+
         /** IMEService onCreate/onDestroy 设置（服务存活标记） */
         @Volatile
         var imeAvailable: Boolean = false

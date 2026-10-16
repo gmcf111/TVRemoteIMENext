@@ -32,12 +32,12 @@ class MouseCursorOverlay(private val context: Context) {
     }
 
     private fun initCursorView() {
-        val imageView = ImageView(context)
+        val imageView = androidx.appcompat.widget.AppCompatImageView(context)
         imageView.setImageResource(R.drawable.mouse_cursor)
         cursorView = imageView
 
         val windowType = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ->
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1 ->
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
                 WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY

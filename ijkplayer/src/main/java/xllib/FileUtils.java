@@ -111,37 +111,37 @@ public class FileUtils {
         }
     }
 
+    /**
+     * 是否为本地文件路径（无网络 scheme）。
+     */
+    public static boolean isLocalFile(String url){
+        if(TextUtils.isEmpty(url)) return false;
+        return !url.toLowerCase().startsWith("http://")
+                && !url.toLowerCase().startsWith("https://")
+                && !url.toLowerCase().startsWith("rtmp://")
+                && !url.toLowerCase().startsWith("rtmps://")
+                && !url.toLowerCase().startsWith("rtsp://")
+                && !url.toLowerCase().startsWith("mms://")
+                && !url.toLowerCase().startsWith("ftp://");
+    }
+
+    /**
+     * 是否为直播流（无总时长、不支持拖动进度）。
+     *
+     * v3.0 判定：rtmp/rtmps/rtsp/mms 一律直播；http(s) 仅当扩展名不是已知媒体容器时按直播处理
+     * （如 .m3u8 直播列表、无扩展名的持续流），其余按点播处理。
+     */
     public static boolean isLiveMedia(String url){
         if(TextUtils.isEmpty(url)) return false;
-        String uri = url.toLowerCase();
-        if(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("rtmp://")  || url.startsWith("rtmps://") || url.startsWith("mms://")){
+        String lower = url.toLowerCase();
+        if(lower.startsWith("rtmp://") || lower.startsWith("rtmps://")
+                || lower.startsWith("rtsp://") || lower.startsWith("mms://")){
             return true;
-        }else{
-            return false;
         }
-    }
-
-    public static boolean isNetworkDownloadTask(String url){
-        if(TextUtils.isEmpty(url)) return false;
-        String uri = url.toLowerCase();
-        if(uri.startsWith("thunder://") || url.startsWith("ftp://") || url.startsWith("http://")
-                || url.startsWith("https://") || url.startsWith("ed2k://") || url.startsWith("magnet:?")){
-            return true;
-        }else{
-            return false;
+        if(lower.startsWith("http://") || lower.startsWith("https://")){
+            String path = lower.split("[?#]")[0];
+            return !isMediaFile(path) || path.endsWith(".m3u8");
         }
-    }
-
-    public static String getMagnetHashCode(String url){
-        if(TextUtils.isEmpty(url)) return "";
-        int p = url.indexOf('=');
-        if(p == -1) return "";
-        String[] hashCode = url.substring(p).split(":");
-        if(hashCode.length > 2){
-            p = hashCode[2].indexOf('&');
-            if(p != -1)hashCode[2] = hashCode[2].substring(0, p);
-            return hashCode[2];
-        }
-        return "";
+        return false;
     }
 }

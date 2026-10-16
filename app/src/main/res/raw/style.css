@@ -647,10 +647,8 @@ button {
    ============================================================ */
 #inputarea,
 #playUrl,
-.editor-textarea,
 .input-small,
-#themeHexInput,
-.select-input {
+#themeHexInput {
 	font: var(--type-body-md);
 	background: transparent;
 	color: var(--md-sys-color-on-surface);
@@ -662,10 +660,8 @@ button {
 
 #inputarea:focus,
 #playUrl:focus,
-.editor-textarea:focus,
 .input-small:focus,
-#themeHexInput:focus,
-.select-input:focus {
+#themeHexInput:focus {
 	outline: none;
 	border-color: var(--md-sys-color-primary);
 	box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
@@ -1081,107 +1077,10 @@ input[type="file"] {
 }
 #playUrl { flex: 1; }
 
-.torrent-input {
-	display: flex;
-	gap: var(--spacing-sm);
-	align-items: center;
-	flex-wrap: wrap;
-	margin-bottom: var(--spacing-md);
-	padding: var(--spacing-md);
-	background: var(--md-sys-color-surface-container);
-	border-radius: var(--shape-md);
-}
-
-.select-input {
-	min-height: 40px;
-	cursor: pointer;
-}
-
-.tv-section { margin-top: var(--spacing-md); }
-
-.tv-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: var(--spacing-md);
-	padding-top: var(--spacing-md);
-	border-top: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.tv-title {
-	font: var(--type-title-md);
-	color: var(--md-sys-color-on-surface);
-}
-.tv-hint {
+.video-hint {
 	font: var(--type-body-sm);
 	color: var(--md-sys-color-on-surface-variant);
-}
-
-.link-primary {
-	color: var(--md-sys-color-primary);
-	text-decoration: none;
-	font-weight: 500;
-}
-.link-primary:hover { text-decoration: underline; }
-
-.tv-items {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--spacing-sm);
-}
-
-/* MD3 outlined card */
-.tv-item {
-	padding: var(--spacing-md);
-	background: var(--md-sys-color-surface-container-low);
-	border: 1px solid var(--md-sys-color-outline-variant);
-	border-radius: var(--shape-md);
-	text-align: center;
-	min-width: 110px;
-	font: var(--type-title-sm);
-	color: var(--md-sys-color-on-surface);
-}
-
-/* MD3 assist chip */
-.tv-source {
-	display: inline-flex;
-	align-items: center;
-	height: 32px;
-	padding: 0 14px;
-	background: var(--md-sys-color-secondary-container);
-	color: var(--md-sys-color-on-secondary-container);
-	border-radius: var(--shape-sm);
-	font: var(--type-label-md);
-	margin: var(--spacing-xs) var(--spacing-xs) 0;
-	cursor: pointer;
-	position: relative;
-	overflow: hidden;
-}
-.tv-source::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	background: currentColor;
-	opacity: 0;
-	transition: opacity var(--motion-short);
-}
-.tv-source:hover::before { opacity: var(--state-hover); }
-.tv-source:active::before { opacity: var(--state-pressed); }
-
-.tv-editor.hidden { display: none; }
-
-.editor-textarea {
-	width: 100%;
-	min-height: 400px;
-	font-family: ui-monospace, "Cascadia Mono", monospace;
-	resize: vertical;
-	margin-bottom: var(--spacing-md);
-}
-
-.editor-actions {
-	display: flex;
-	gap: var(--spacing-sm);
-	justify-content: flex-end;
+	margin-top: var(--spacing-sm);
 }
 
 /* ============================================================
@@ -1437,10 +1336,8 @@ input[type="file"] {
 	#confirm.btn-primary { position: static; width: 100%; margin-top: var(--spacing-sm); }
 	.upload-wrapper { flex-direction: column; align-items: stretch; }
 	.progress-wrap { min-width: 100%; }
-	.torrent-input { flex-direction: column; align-items: stretch; }
-	.tv-header { flex-direction: column; align-items: flex-start; gap: var(--spacing-xs); }
-	.editor-actions { flex-direction: column; }
-	.editor-actions button { width: 100%; }
+	.input-row { flex-direction: column; }
+	.input-row .btn-primary { width: 100%; }
 }
 
 /* ============================================================

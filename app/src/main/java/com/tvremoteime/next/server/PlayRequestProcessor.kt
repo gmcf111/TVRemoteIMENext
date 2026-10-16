@@ -3,15 +3,17 @@ package com.tvremoteime.next.server
 import android.content.Context
 import com.tvremoteime.next.core.VideoPlayHelper
 import fi.iki.elonen.NanoHTTPD
+import player.XLVideoPlayActivity
 import player.settings.GlobalSettings
-import xllib.DownloadManager
 
 /**
- * 播放控制端点（对应旧版 PlayRequestProcesser.java）
+ * 播放控制端点（对应旧版 PlayRequestProcessor.java）
  *
  * POST /play {playUrl, useSystem}
  * POST /playStop
  * POST /changePlayFFI {speedInterval}
+ *
+ * v3.0：移除迅雷下载任务后，/playStop 语义改为结束当前播放实例。
  */
 class PlayRequestProcessor(private val context: Context) : RequestProcessor {
 
@@ -34,12 +36,12 @@ class PlayRequestProcessor(private val context: Context) : RequestProcessor {
             "/play" -> {
                 val playUrl = params["playUrl"]
                 if (!playUrl.isNullOrEmpty()) {
-                    VideoPlayHelper.playUrl(context, playUrl, 0, params["useSystem"] == "true")
+                    VideoPlayHelper.playUrl(context, playUrl, params["useSystem"] == "true")
                 }
                 ok
             }
             "/playStop" -> {
-                DownloadManager.instance().taskInstance().stopTask()
+                XLVideoPlayActivity.stopRunningInstance()
                 ok
             }
             "/changePlayFFI" -> {

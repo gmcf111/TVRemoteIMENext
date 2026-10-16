@@ -49,7 +49,7 @@ object AppPackagesHelper {
         val pm = context.packageManager
         val appInfos = mutableListOf<AppInfo>()
         // API 30+ 需 <queries> 声明；GET_UNINSTALLED_PACKAGES 沿旧语义
-        val listAppcations = pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
+        val listAppcations = pm.getInstalledApplications(0)
         for (app in listAppcations) {
             val isSysApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
             if (containSysApp || !isSysApp) {
@@ -123,7 +123,8 @@ object AppPackagesHelper {
         if (getApplicationInfo(packageName, context) == null) return
         try {
             val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-            intent?.let { context.startActivity(it) }
+                ?: if (android.os.Build.VERSION.SDK_INT >= 21) context.packageManager.getLeanbackLaunchIntentForPackage(packageName) else null
+            intent?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             Log.i(TAG, "已运行应用包[$packageName]")
         } catch (e: Exception) {
             Log.e(TAG, "运行应用包[$packageName]出错", e)
@@ -142,9 +143,14 @@ object AppPackagesHelper {
 
     fun getAppIcon(packageName: String, context: Context): ByteArray? {
         val applicationInfo = getApplicationInfo(packageName, context) ?: return null
-        val bitmap = (applicationInfo.loadIcon(context.packageManager) as? BitmapDrawable)?.bitmap ?: return null
+        val drawable = applicationInfo.loadIcon(context.packageManager)
+        val bitmap = Bitmap.createBitmap(drawable.intrinsicWidth.coerceAtLeast(1), drawable.intrinsicHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
         val data = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, data)
+        bitmap.recycle()
         return data.toByteArray()
     }
 }

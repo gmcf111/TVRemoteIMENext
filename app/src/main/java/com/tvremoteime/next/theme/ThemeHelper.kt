@@ -48,7 +48,9 @@ object ThemeHelper {
         val seed = ThemePrefs.parseHex(hex) ?: return
         val primary = com.tvremoteime.next.theme.TonalPalette.primary(seed)
         views.forEach { v ->
-            v?.setBackgroundColor(primary)
+            v?.let {
+                androidx.core.view.ViewCompat.setBackgroundTintList(it, android.content.res.ColorStateList.valueOf(primary))
+            }
         }
     }
 

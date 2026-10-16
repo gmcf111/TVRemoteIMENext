@@ -24,8 +24,8 @@ class RemoteServer(
 
     interface DataReceiver {
         /** keyAction: 0 = keypressed, 1 = keydown, 2 = keyup */
-        fun onKeyEventReceived(keyCode: String, keyAction: Int)
-        fun onTextReceived(text: String)
+        fun onKeyEventReceived(keyCode: String, keyAction: Int): Boolean
+        fun onTextReceived(text: String): Boolean
     }
 
     var dataReceiver: DataReceiver? = null
@@ -43,9 +43,9 @@ class RemoteServer(
 
     @Throws(IOException::class)
     override fun start(timeout: Int, daemon: Boolean) {
-        isStarted = true
         tempFileManagerFactory = ServerFileManager.Factory()
         super.start(timeout, daemon)
+        isStarted = true
     }
 
     override fun stop() {
@@ -65,7 +65,6 @@ class RemoteServer(
             add(RawRequestProcessor(context, "/favicon.ico", R.drawable.ic_launcher, "image/x-icon"))
             add(FileRequestProcessor(context))
             add(AppIconRequestProcessor(context))
-            add(TVRequestProcessor(context))
             add(MouseRequestProcessor(context, this@RemoteServer))
             add(ChannelInfoRequestProcessor(context))
             add(ScreenshotRequestProcessor(context))
@@ -82,19 +81,23 @@ class RemoteServer(
             add(AppRequestProcessor(context))
             add(PlayRequestProcessor(context))
             add(FileRequestProcessor(context))
-            add(TVRequestProcessor(context))
-            add(TorrentRequestProcessor(context))
             add(ThemeRequestProcessor(context))
             add(OtherPostRequestProcessor(context))
         }
     }
 
-    override fun serve(session: IHTTPSession): Response {
+    override fun serve(session: IHTTPSession): Response = try {
+        serveRequest(session)
+    } catch (error: Exception) {
+        Log.e(Env.TAG, "HTTP request failed: ${session.uri}", error)
+        createPlainTextResponse(Response.Status.INTERNAL_ERROR, "Request failed")
+    }
+
+    private fun serveRequest(session: IHTTPSession): Response {
         Log.i(Env.TAG, "接收到HTTP请求：${session.method} ${session.uri}")
         if (session.uri.isNotEmpty()) {
-            var fileName = session.uri.trim()
-            val qIdx = fileName.indexOf('?')
-            if (qIdx >= 0) fileName = fileName.substring(0, qIdx)
+            // NanoHTTPD 已分离 query 并解码 URI。文件名中可以包含 ? 和空格。
+            val fileName = session.uri
 
             if (session.method == Method.GET) {
                 for (processor in getRequestProcessors) {

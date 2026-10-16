@@ -15,6 +15,7 @@ object ControlCenter {
 
     @Volatile
     private var rootChannelInternal: RootChannel? = null
+    private var mouseInternal: MouseController? = null
 
     fun init(context: Context) {
         if (routerInternal == null) {
@@ -22,6 +23,7 @@ object ControlCenter {
                 if (routerInternal == null) {
                     val appContext = context.applicationContext
                     rootChannelInternal = RootChannel(appContext)
+                    mouseInternal = MouseController(appContext)
                     routerInternal = ChannelRouter(
                         listOf(
                             rootChannelInternal!!,
@@ -38,6 +40,25 @@ object ControlCenter {
     fun router(): ChannelRouter = routerInternal ?: ChannelRouter(emptyList())
 
     fun root(): RootChannel? = rootChannelInternal
+    fun mouse(): MouseController = checkNotNull(mouseInternal) { "ControlCenter.init must be called first" }
+
+    fun sendKey(code: Int): Boolean = router().execute(Capability.KEY) {
+        when (it) {
+            is RootChannel -> it.sendKey(code)
+            is ImeChannel -> it.sendKey(code)
+            is AdbChannel -> it.sendKey(code)
+            else -> false
+        }
+    }
+
+    fun sendText(text: String): Boolean = router().execute(Capability.TEXT) {
+        when (it) {
+            is ImeChannel -> it.commitText(text)
+            is RootChannel -> it.sendText(text)
+            is AdbChannel -> it.sendText(text)
+            else -> false
+        }
+    }
 
     // ============ /channel-info 上报（02 文档 2.4） ============
 

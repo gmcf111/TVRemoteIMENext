@@ -30,13 +30,15 @@ class InputRequestProcessor(
         files: Map<String, String>
     ): NanoHTTPD.Response {
         val receiver = remoteServer.dataReceiver
-        when (fileName) {
+        val success = when (fileName) {
             "/text" -> params["text"]?.let { receiver?.onTextReceived(it) }
             "/key" -> params["code"]?.let { receiver?.onKeyEventReceived(it, KEY_ACTION_PRESSED) }
             "/keyup" -> params["code"]?.let { receiver?.onKeyEventReceived(it, KEY_ACTION_UP) }
             "/keydown" -> params["code"]?.let { receiver?.onKeyEventReceived(it, KEY_ACTION_DOWN) }
+            else -> false
         }
-        return RemoteServer.createPlainTextResponse(NanoHTTPD.Response.Status.OK, "ok")
+        return if (success == true) RemoteServer.createPlainTextResponse(NanoHTTPD.Response.Status.OK, "ok")
+        else RemoteServer.createPlainTextResponse(NanoHTTPD.Response.Status.SERVICE_UNAVAILABLE, "No available input channel")
     }
 
     companion object {

@@ -9,7 +9,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.ConnectException;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class represents an ADB connection.
@@ -55,7 +55,7 @@ public class AdbConnection implements Closeable {
 	/**
 	 * Specifies whether a CNXN packet has been received from the peer.
 	 */
-	private boolean connected;
+	private volatile boolean connected;
 
 	/**
 	 * Specifies the maximum amount data that can be sent to the remote peer.
@@ -76,7 +76,7 @@ public class AdbConnection implements Closeable {
 	/**
 	 * A hash map of our open streams indexed by local ID.
 	 **/
-	private HashMap<Integer, AdbStream> openStreams;
+	private ConcurrentHashMap<Integer, AdbStream> openStreams;
 
 	private ConnectionOnClosedListener onClosedListener;
 	public void setOnClosedListener(ConnectionOnClosedListener listener){
@@ -88,7 +88,7 @@ public class AdbConnection implements Closeable {
 	 */
 	private AdbConnection()
 	{
-		openStreams = new HashMap<Integer, AdbStream>();
+		openStreams = new ConcurrentHashMap<Integer, AdbStream>();
 		lastLocalId = 0;
 		connectionThread = createConnectionThread();
 	}
@@ -229,6 +229,7 @@ public class AdbConnection implements Closeable {
 
 				/* This thread takes care of cleaning up pending streams */
 				synchronized (conn) {
+					conn.connected = false;
 					cleanupStreams();
 					conn.notifyAll();
 					conn.connectAttempted = false;
@@ -328,17 +329,24 @@ public class AdbConnection implements Closeable {
 		AdbStream stream = new AdbStream(this, localId);
 		openStreams.put(localId, stream);
 
-		/* Send the open */
-		outputStream.write(AdbProtocol.generateOpen(localId, destination));
-		outputStream.flush();
-		
-		/* Wait for the connection thread to receive the OKAY */
+		/* Hold the stream monitor before sending: an immediate OKAY must not be lost. */
 		synchronized (stream) {
-			stream.wait();
+			outputStream.write(AdbProtocol.generateOpen(localId, destination));
+			outputStream.flush();
+			long deadline = System.nanoTime() + 10000000000L;
+			while (!stream.isOpen() && !stream.isClosed()) {
+				long remaining = deadline - System.nanoTime();
+				if (remaining <= 0) {
+					openStreams.remove(localId);
+					stream.close();
+					throw new SocketTimeoutException("ADB stream open timed out");
+				}
+				stream.wait(Math.max(1, remaining / 1000000L));
+			}
 		}
 		
 		/* Check if the open was rejected */
-		if (stream.isClosed())
+		if (stream.isClosed() && !stream.isOpen())
 			throw new ConnectException("Stream open actively rejected by remote peer");
 		
 		/* We're fully setup now */
@@ -378,7 +386,7 @@ public class AdbConnection implements Closeable {
 		/* Wait for the connection thread to die */
 		connectionThread.interrupt();
 		try {
-			connectionThread.join();
+			if (Thread.currentThread() != connectionThread) connectionThread.join(1000);
 		} catch (InterruptedException e) { }
 	}
 }

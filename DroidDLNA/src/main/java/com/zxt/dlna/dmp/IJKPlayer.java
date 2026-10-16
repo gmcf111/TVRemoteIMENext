@@ -54,9 +54,9 @@ public class IJKPlayer extends XLVideoPlayActivity
     }
 
     @Override
-    protected void startDownloadTask(String videoPath, int videoIndex) {
-        super.startDownloadTask(videoPath, videoIndex);
-        //非直播源
+    protected void preparePlaySource(String videoPath, int videoIndex) {
+        super.preparePlaySource(videoPath, videoIndex);
+        //投屏源一律按点播处理，不启用直播态进度逻辑
         isLive = false;
     }
 

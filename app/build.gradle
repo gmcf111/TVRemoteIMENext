@@ -32,8 +32,8 @@ android {
         applicationId "com.tvremoteime.next"
         minSdk libs.versions.minSdk.get().toInteger()
         targetSdk libs.versions.targetSdk.get().toInteger()
-        versionCode 200
-        versionName "2.0.0"
+        versionCode 300
+        versionName "3.0.0"
         // minSdk 19 < 21 必须 legacy multidex（方法数 68k 超限）
         multiDexEnabled true
         // 仅 32 位（03 文档决策）：NDK 不在 CI 引入，v7a so 全部随包
@@ -63,12 +63,15 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
+
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
 }
 
 dependencies {
     implementation project(':adb-lib')
     implementation project(':ijkplayer')
-    implementation project(':thunder')
     implementation project(':DroidDLNA')
 
     implementation libs.androidx.core
@@ -81,4 +84,5 @@ dependencies {
     implementation "androidx.multidex:multidex:2.0.1"
 
     testImplementation libs.junit
+    testImplementation 'org.robolectric:robolectric:4.14.1'
 }

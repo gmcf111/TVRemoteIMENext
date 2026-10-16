@@ -21,18 +21,4 @@ class AccessibilityChannel : ControlChannel {
 
     override fun isAvailable(): Boolean = MouseAccessibilityService.isServiceEnabled()
 
-    fun move(dx: Int, dy: Int): IntArray? =
-        MouseAccessibilityService.getInstance()?.moveMouse(dx, dy)
-
-    fun click(button: Int): Boolean =
-        MouseAccessibilityService.getInstance()?.click(button) ?: false
-
-    fun scroll(dy: Int): Boolean =
-        MouseAccessibilityService.getInstance()?.scroll(dy) ?: false
-
-    fun swipeUp(distance: Int): Boolean =
-        MouseAccessibilityService.getInstance()?.swipeUp(distance) ?: false
-
-    fun swipeDown(distance: Int): Boolean =
-        MouseAccessibilityService.getInstance()?.swipeDown(distance) ?: false
 }

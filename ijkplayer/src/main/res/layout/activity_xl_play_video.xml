@@ -173,18 +173,6 @@
                     android:text="缓冲中" />
             </RelativeLayout>
 
-            <!--playlist-->
-            <android.support.v7.widget.RecyclerView
-                android:id="@+id/play_list_view"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentBottom="true"
-                android:background="@color/Grey_50"
-                android:divider="#ffdddddd"
-                android:dividerHeight="1px"
-                android:visibility="gone"
-                ></android.support.v7.widget.RecyclerView>
-
         </RelativeLayout>
 
         <RelativeLayout
@@ -200,21 +188,10 @@
             android:visibility="visible">
 
             <ImageView
-                android:id="@+id/app_play_btn_play_list"
-                android:layout_width="@dimen/ic_play_btn_wh"
-                android:layout_height="@dimen/ic_play_btn_wh"
-                android:layout_centerVertical="true"
-                android:src="@android:drawable/ic_menu_compass"
-                style="@style/app_play_btn_style"
-                android:visibility="gone"
-                />
-
-            <ImageView
                 android:id="@+id/app_video_play"
                 android:layout_width="@dimen/ic_play_btn_wh"
                 android:layout_height="@dimen/ic_play_btn_wh"
                 android:layout_centerVertical="true"
-                android:layout_toRightOf="@+id/app_play_btn_play_list"
                 android:src="@drawable/ic_play_arrow_white_24dp"
                 style="@style/app_play_btn_style"
                 android:visibility="gone" />

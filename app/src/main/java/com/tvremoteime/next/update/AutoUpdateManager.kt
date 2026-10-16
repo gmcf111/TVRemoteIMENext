@@ -26,12 +26,15 @@ class AutoUpdateManager(
         // 可配置：换仓库/镜像只需改这一处
         private const val VERSION_URL =
             "https://github.com/gmcf111/TVRemoteIMENext/releases/latest/download/version.json"
+
+        private val checkStarted = java.util.concurrent.atomic.AtomicBoolean(false)
     }
 
-    private val localFile: File = File(context.externalCacheDir, context.getString(R.string.app_name) + ".apk")
+    private val localFile: File = File(context.externalCacheDir ?: context.cacheDir, "TVRemoteIMENext.apk")
 
     init {
-        startUpdateThread()
+        // 主界面每次重建（含换主题 recreate）都会构造本类；每个进程只检查一次。
+        if (checkStarted.compareAndSet(false, true)) startUpdateThread()
     }
 
     private fun startUpdateThread() {
@@ -52,6 +55,8 @@ class AutoUpdateManager(
                         val forced = versionObj.has("forced") && versionObj.getBoolean("forced")
 
                         handler.post {
+                            val activity = context as? android.app.Activity ?: return@post
+                            if (activity.isFinishing || activity.isDestroyed) return@post
                             try {
                                 val builder = AlertDialog.Builder(context)
                                 builder.setTitle(context.getString(R.string.app_name) + "版本更新提示")
@@ -68,8 +73,7 @@ class AutoUpdateManager(
                                 dialog.setCanceledOnTouchOutside(false)
                                 dialog.show()
                             } catch (ex: Exception) {
-                                // IME 上下文无窗口令牌时直接拉起安装
-                                AppPackagesHelper.installPackage(localFile, context)
+                                Log.e(TAG, "Unable to display update dialog", ex)
                             }
                         }
                     }
@@ -113,7 +117,7 @@ class AutoUpdateManager(
             val packInfo = context.packageManager.getPackageArchiveInfo(
                 localFile.absolutePath, PackageManager.GET_ACTIVITIES
             ) ?: return true
-            packInfo.versionCode < versionObj.getInt("versionCode")
+            packInfo.packageName != context.packageName || packInfo.versionCode != versionObj.getInt("versionCode")
         } catch (e: Exception) {
             true
         }
@@ -124,7 +128,7 @@ class AutoUpdateManager(
             if (!needDownloadAPK(versionObj)) return true
             val url = versionObj.getString("installAPK")
             if (url.isNullOrEmpty()) return false
-            HttpGet.downloadFile(url, localFile)
+            HttpGet.downloadFile(url, localFile) && !needDownloadAPK(versionObj)
         } catch (e: Exception) {
             Log.e(TAG, "downloadInstallAPK", e)
             false

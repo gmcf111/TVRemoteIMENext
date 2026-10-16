@@ -16,16 +16,11 @@ import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.TextView
 import com.tvremoteime.next.R
-import com.tvremoteime.next.adb.AdbHelper
 import com.tvremoteime.next.core.Env
 import com.tvremoteime.next.core.KeyEventUtils
 import com.tvremoteime.next.core.QRCodeGen
 import com.tvremoteime.next.core.AppPackagesHelper
-import com.tvremoteime.next.dlna.DLNAUtils
 import com.tvremoteime.next.server.RemoteServer
-import com.tvremoteime.next.server.ServerFileManager
-import com.tvremoteime.next.update.AutoUpdateManager
-import java.io.IOException
 
 /**
  * 输入法服务（对应旧版 IMEService.java）
@@ -58,31 +53,46 @@ class IMEService : InputMethodService(), View.OnClickListener {
     private var qrCodeImage: android.widget.ImageView? = null
     private var addressView: TextView? = null
 
-    private var mServer: RemoteServer? = null
     private var qweLine: LinearLayout? = null
     private var asdLine: LinearLayout? = null
     private var zxcLine: LinearLayout? = null
 
     private val handler = Handler()
+    private val themeListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        handler.post { applyKeyboardTheme() }
+    }
 
     override fun onCreate() {
         super.onCreate()
         Env.initToastHandler()
+        com.tvremoteime.next.theme.ThemePrefs.prefs(this).registerOnSharedPreferenceChangeListener(themeListener)
         com.tvremoteime.next.control.ControlCenter.init(this)
         com.tvremoteime.next.control.ImeChannel.imeAvailable = true
-        com.tvremoteime.next.control.ImeChannel.imeTextHook = { text -> commitText(text) }
-        com.tvremoteime.next.control.ImeChannel.imeKeyHook = { keyCode ->
-            sendKeyCode(keyCode)
-            true
+        com.tvremoteime.next.control.ImeChannel.imeTextHook = { text ->
+            com.tvremoteime.next.core.MainThread.call { commitText(text) }
         }
-        ServerFileManager.resetBaseDir(this)
-        startRemoteServer()
-        DLNAUtils.startDLNAService(applicationContext)
-        AutoUpdateManager(this, handler)
+        com.tvremoteime.next.control.ImeChannel.imeKeyHook = { keyCode ->
+            com.tvremoteime.next.core.MainThread.call {
+                if (currentInputConnection == null && keyCode != KeyEvent.KEYCODE_HOME) false else { sendKeyCode(keyCode); true }
+            }
+        }
+        com.tvremoteime.next.control.ImeChannel.imeDispatchHook = { code, action ->
+            com.tvremoteime.next.core.MainThread.call { handleRemoteKey(code, action) }
+        }
+        com.tvremoteime.next.server.RemoteControlService.start(this)
     }
 
     override fun onCreateInputView(): View {
         mInputView = layoutInflater.inflate(R.layout.keyboard, null) as RelativeLayout
+        focusedView = null
+        fun bindButtons(group: android.view.ViewGroup) {
+            for (i in 0 until group.childCount) {
+                val child = group.getChildAt(i)
+                if (child is Button || child is ImageButton) child.setOnClickListener(this)
+                if (child is android.view.ViewGroup) bindButtons(child)
+            }
+        }
+        bindButtons(mInputView!!)
 
         // 主题色跟随（04 文档 5.1）：一次构建动态 drawable 并缓存，键背景全部替换
         applyKeyboardTheme()
@@ -120,16 +130,17 @@ class IMEService : InputMethodService(), View.OnClickListener {
             for (j in 0 until row.childCount) {
                 val child = row.getChildAt(j) ?: continue
                 when (child.id) {
-                    R.id.btnCaps -> child.background = shiftOff
-                    in actionIds -> child.background = action
-                    else -> if (child is Button || child is ImageButton) child.background = modern
+                    R.id.btnCaps -> child.background = (if (capsOn) shiftOn else shiftOff).constantState!!.newDrawable().mutate()
+                    in actionIds -> child.background = action.constantState!!.newDrawable().mutate()
+                    else -> if (child is Button || child is ImageButton) child.background = modern.constantState!!.newDrawable().mutate()
                 }
+                if (child is Button) child.setTextColor(if (child.id in actionIds) android.graphics.Color.WHITE else android.graphics.Color.rgb(30, 30, 30))
             }
         }
         // 帮助弹窗嵌套层（helpDialog 内无按键）
         // 键盘容器背景：主题色调浅色（替代布局里写死的 #444）
-        val accent = com.tvremoteime.next.theme.ThemePrefs.getAccentColor(this)
-        if (accent != null) {
+        val accent = com.tvremoteime.next.theme.ThemePrefs.getAccentColor(this) ?: 0xFF0061A4.toInt()
+        run {
             val hsv = FloatArray(3)
             android.graphics.Color.colorToHSV(accent, hsv)
             hsv[1] *= 0.18f
@@ -150,95 +161,27 @@ class IMEService : InputMethodService(), View.OnClickListener {
 
     override fun onEvaluateFullscreenMode(): Boolean = false
 
-    private fun isSendToAdbService(data: Any): Boolean {
-        if (AdbHelper.initService(applicationContext)) {
-            AdbHelper.getInstance()?.sendData(data)
-            return true
+    private val remoteKeyDownTimes = mutableMapOf<Int, Long>()
+
+    private fun handleRemoteKey(code: String, action: Int): Boolean {
+        if (code.equals("cls", true)) return currentInputConnection?.deleteSurroundingText(Int.MAX_VALUE, Int.MAX_VALUE) == true
+        val key = KeyEvent.keyCodeFromString(code)
+        if (key == KeyEvent.KEYCODE_UNKNOWN) return false
+        if (mInputView?.isShown == true && KeyEventUtils.isKeyboardFocusEvent(key)) {
+            return action == KEY_ACTION_UP || handleKeyboardFocusEvent(key)
         }
-        return false
-    }
-
-    private fun startRemoteServer() {
-        do {
-            mServer = RemoteServer(RemoteServer.serverPort, this)
-            mServer?.dataReceiver = object : RemoteServer.DataReceiver {
-                override fun onKeyEventReceived(keyCode: String, keyAction: Int) {
-                    if ("cls".equals(keyCode, ignoreCase = true)) {
-                        val ic = currentInputConnection
-                        ic?.deleteSurroundingText(Int.MAX_VALUE, Int.MAX_VALUE)
-                    } else {
-                        val kc = KeyEvent.keyCodeFromString(keyCode)
-                        if (kc != KeyEvent.KEYCODE_UNKNOWN) {
-                            if (mInputView != null && KeyEventUtils.isKeyboardFocusEvent(kc) && mInputView!!.isShown) {
-                                if (keyAction == KEY_ACTION_PRESSED || keyAction == KEY_ACTION_DOWN) {
-                                    handler.post {
-                                        if (!handleKeyboardFocusEvent(kc)) {
-                                            if (!isSendToAdbService(kc)) sendKeyCode(kc)
-                                        }
-                                    }
-                                }
-                            } else {
-                                val eventTime = SystemClock.uptimeMillis()
-                                val ic = currentInputConnection
-                                when (keyAction) {
-                                    KEY_ACTION_PRESSED -> {
-                                        // 02 文档按键域优先级：Root → IME → ADB
-                                        val root = com.tvremoteime.next.control.ControlCenter.root()
-                                        if (root != null && root.isAvailable()) {
-                                            root.sendKey(kc)
-                                        } else if (!isSendToAdbService(kc)) {
-                                            sendKeyCode(kc)
-                                        }
-                                    }
-                                    KEY_ACTION_DOWN -> {
-                                        if (!isSendToAdbService(kc) && ic != null) {
-                                            ic.sendKeyEvent(
-                                                KeyEvent(
-                                                    eventTime, eventTime, KeyEvent.ACTION_DOWN, kc, 0, 0,
-                                                    KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
-                                                    KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
-                                                )
-                                            )
-                                        }
-                                    }
-                                    KEY_ACTION_UP -> {
-                                        ic?.sendKeyEvent(
-                                            KeyEvent(
-                                                eventTime, eventTime, KeyEvent.ACTION_UP, kc, 0, 0,
-                                                KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
-                                                KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                override fun onTextReceived(text: String) {
-                    // 02 文档文字域：IME 激活时优先 IME（最快），否则 Root，最后 ADB
-                    if (!commitText(text)) {
-                        val root = com.tvremoteime.next.control.ControlCenter.root()
-                        if (root != null && root.isAvailable()) {
-                            root.sendText(text)
-                        } else {
-                            isSendToAdbService(text)
-                        }
-                    }
-                }
-            }
-            try {
-                mServer?.start()
-                Env.toastInHandler(this, getString(R.string.app_name) + "远程服务已启动")
-                Log.i(TAG, "远程服务创建成功！port=${RemoteServer.serverPort}")
-                break
-            } catch (ex: IOException) {
-                Log.e(TAG, "建立输入HTTP服务时出错", ex)
-                RemoteServer.serverPort++
-                mServer?.stop()
-            }
-        } while (RemoteServer.serverPort < 9999)
+        if (action == KEY_ACTION_PRESSED) return false
+        if (action == KEY_ACTION_DOWN && com.tvremoteime.next.control.ControlCenter.root()?.isAvailable() == true) return false
+        val connection = currentInputConnection ?: return false
+        val now = SystemClock.uptimeMillis()
+        val down = if (action == KEY_ACTION_DOWN) remoteKeyDownTimes.getOrPut(key) { now }
+            else remoteKeyDownTimes.remove(key) ?: return false
+        val sent = connection.sendKeyEvent(KeyEvent(down, now,
+            if (action == KEY_ACTION_DOWN) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP,
+            key, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
+            KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE))
+        if (!sent) remoteKeyDownTimes.remove(key)
+        return sent
     }
 
     private fun commitText(text: String): Boolean {
@@ -271,16 +214,12 @@ class IMEService : InputMethodService(), View.OnClickListener {
     }
 
     override fun onDestroy() {
+        com.tvremoteime.next.theme.ThemePrefs.prefs(this).unregisterOnSharedPreferenceChangeListener(themeListener)
         com.tvremoteime.next.control.ImeChannel.imeAvailable = false
         com.tvremoteime.next.control.ImeChannel.imeTextHook = null
         com.tvremoteime.next.control.ImeChannel.imeKeyHook = null
-        if (mServer != null && mServer!!.starting) {
-            Log.i(TAG, "远程输入服务已停止！")
-            mServer?.stop()
-        }
-        DLNAUtils.stopDLNAService()
-        AdbHelper.stopService()
-        Env.toastInHandler(this, getString(R.string.app_name) + "服务已停止")
+        com.tvremoteime.next.control.ImeChannel.imeDispatchHook = null
+        handler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 
@@ -385,21 +324,15 @@ class IMEService : InputMethodService(), View.OnClickListener {
     }
 
     private fun clickButtonByKey(v: View) {
-        when (v.id) {
-            R.id.btnCaps -> v.background = if (capsOn) keyShiftOnBg else keyShiftOffBg
-            R.id.btnClose -> {
-                hideWindowByKey = true
-                finishInput()
-                return
-            }
-            else -> keyModernBg?.let { v.background = it }
+        if (v.id == R.id.btnClose) {
+            hideWindowByKey = true
+            finishInput()
+            return
         }
-        clickButton(v, false)
+        v.isPressed = true
+        clickButton(v, true)
         handler.postDelayed({
-            when {
-                v === btnCaps -> v.background = if (capsOn) keyShiftOnBg else keyShiftOffBg
-                else -> keyModernBg?.let { v.background = it }
-            }
+            v.isPressed = false
             v.requestFocus()
         }, 200)
     }
@@ -436,7 +369,7 @@ class IMEService : InputMethodService(), View.OnClickListener {
     private fun toggleCapsState(resetCapsButtonState: Boolean) {
         capsOn = !capsOn
         if (resetCapsButtonState)
-            keyShiftOffBg?.let { btnCaps?.background = it }
+            (if (capsOn) keyShiftOnBg else keyShiftOffBg)?.let { btnCaps?.background = it.constantState!!.newDrawable().mutate() }
         resetButtonChar(qweLine)
         resetButtonChar(asdLine)
         resetButtonChar(zxcLine)
@@ -453,12 +386,11 @@ class IMEService : InputMethodService(), View.OnClickListener {
     }
 
     private fun showHelpDialog() {
-        val server = mServer ?: return
         if (addressView?.text?.isEmpty() == true) {
             val version = AppPackagesHelper.getCurrentPackageVersion(this)
             val title = helpDialog?.findViewById<TextView>(R.id.title)
             title?.text = title?.text.toString() + " " + version
-            val address = server.getServerAddress()
+            val address = RemoteServer.getServerAddress(this)
             addressView?.text = address
             qrCodeImage?.setImageBitmap(QRCodeGen.generateBitmap(address, 300, 300))
         }

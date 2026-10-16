@@ -25,7 +25,7 @@ object Env {
     }
 
     fun initToastHandler() {
-        if (toastHandler == null) toastHandler = Handler()
+        if (toastHandler == null) toastHandler = Handler(android.os.Looper.getMainLooper())
     }
 
     fun toastInHandler(context: Context?, msg: String) {
@@ -49,7 +49,7 @@ object Env {
         val defaultIme = Settings.Secure.getString(
             context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD
         )
-        defaultIme != null && defaultIme.startsWith(context.packageName)
+        defaultIme != null && android.content.ComponentName.unflattenFromString(defaultIme)?.packageName == context.packageName
     } catch (e: Exception) {
         false
     }

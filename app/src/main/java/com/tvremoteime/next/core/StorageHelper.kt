@@ -24,10 +24,9 @@ object StorageHelper {
     fun hasFullDiskAccess(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Environment.isExternalStorageManager()
-        } else {
-            // API 23-29：写权限即可全盘写；API 19-22 install time 权限
-            true
-        }
+        } else androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     /** 当前可用的存储根：全盘授权 → /storage/emulated/0；否则 → 应用外部私有目录 */
@@ -36,7 +35,7 @@ object StorageHelper {
             Environment.getExternalStorageDirectory()
         } else {
             context.getExternalFilesDir(null)
-                ?: Environment.getExternalStorageDirectory()
+                ?: context.filesDir
         }
     }
 
@@ -55,8 +54,7 @@ object StorageHelper {
                 try {
                     context.startActivity(
                         Intent(
-                            Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:${context.packageName}")
+                            Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
                         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
                 } catch (ignored: Exception) {
